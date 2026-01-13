@@ -1,0 +1,1411 @@
+# File Mappings Configuration
+# This file defines how different file types are classified and processed
+
+version: "1.0"
+
+# Extensions mapping - maps file extensions to processing strategies
+extensions:
+  # Java Ecosystem
+  .java:
+    type: code
+    language: java
+    strategy: java_semantic
+    description: "Java source files"
+    
+  .groovy:
+    type: code
+    language: groovy
+    strategy: groovy_semantic
+    description: "Groovy scripts and classes"
+    
+  .scala:
+    type: code
+    language: scala
+    strategy: scala_semantic
+    description: "Scala source files"
+    
+  .kt:
+    type: code
+    language: kotlin
+    strategy: kotlin_semantic
+    description: "Kotlin source files"
+    
+  .clj:
+    type: code
+    language: clojure
+    strategy: clojure_semantic
+    description: "Clojure source files"
+
+  # Web Development - JavaScript/TypeScript
+  .js:
+    type: code
+    language: javascript
+    strategy: js_semantic
+    description: "JavaScript files"
+    
+  .jsx:
+    type: code
+    language: react
+    strategy: jsx_semantic
+    description: "React JSX files"
+    
+  .ts:
+    type: code
+    language: typescript
+    strategy: ts_semantic
+    description: "TypeScript files"
+    
+  .tsx:
+    type: code
+    language: react-typescript
+    strategy: tsx_semantic
+    description: "React TypeScript files"
+    
+  .vue:
+    type: code
+    language: vue
+    strategy: vue_component
+    description: "Vue.js components"
+    
+  .svelte:
+    type: code
+    language: svelte
+    strategy: svelte_component
+    description: "Svelte components"
+
+  # Python
+  .py:
+    type: code
+    language: python
+    strategy: python_semantic
+    description: "Python source files"
+    
+  .pyw:
+    type: code
+    language: python
+    strategy: python_semantic
+    description: "Python Windows GUI files"
+    
+  .pyx:
+    type: code
+    language: cython
+    strategy: python_semantic
+    description: "Cython source files"
+
+  # Database Files
+  .sql:
+    type: query
+    language: sql
+    strategy: sql_statement
+    description: "SQL scripts"
+    
+  .plsql:
+    type: query
+    language: plsql
+    strategy: plsql_block
+    description: "Oracle PL/SQL scripts"
+    
+  .psql:
+    type: query
+    language: postgresql
+    strategy: sql_statement
+    description: "PostgreSQL scripts"
+    
+  .hql:
+    type: query
+    language: hql
+    strategy: hql_statement
+    description: "Hibernate Query Language"
+    
+  .cql:
+    type: query
+    language: cassandra
+    strategy: cql_statement
+    description: "Cassandra Query Language"
+    
+  .ddl:
+    type: query
+    language: sql-ddl
+    strategy: sql_ddl
+    description: "Database Definition Language"
+    
+  .dml:
+    type: query
+    language: sql-dml
+    strategy: sql_dml
+    description: "Database Manipulation Language"
+
+  # Configuration Files
+  .xml:
+    type: config
+    language: xml
+    strategy: xml_structure
+    description: "XML configuration files"
+    
+  .yml:
+    type: config
+    language: yaml
+    strategy: yaml_structure
+    description: "YAML configuration files"
+    
+  .yaml:
+    type: config
+    language: yaml
+    strategy: yaml_structure
+    description: "YAML configuration files"
+    
+  .json:
+    type: config
+    language: json
+    strategy: json_structure
+    description: "JSON configuration files"
+    
+  .properties:
+    type: config
+    language: properties
+    strategy: properties_kv
+    description: "Java properties files"
+    
+  .toml:
+    type: config
+    language: toml
+    strategy: toml_structure
+    description: "TOML configuration files"
+    
+  .ini:
+    type: config
+    language: ini
+    strategy: ini_sections
+    description: "INI configuration files"
+    
+  .cfg:
+    type: config
+    language: config
+    strategy: ini_sections
+    description: "Generic configuration files"
+    
+  .conf:
+    type: config
+    language: config
+    strategy: conf_structure
+    description: "Configuration files"
+    
+  .env:
+    type: config
+    language: env
+    strategy: env_vars
+    description: "Environment variable files"
+
+  # Infrastructure as Code
+  .tf:
+    type: iac
+    language: terraform
+    strategy: terraform_resource
+    description: "Terraform configuration"
+    
+  .tfvars:
+    type: iac
+    language: terraform
+    strategy: tfvars_kv
+    description: "Terraform variables"
+    
+  .tfstate:
+    type: iac
+    language: terraform-state
+    strategy: skip
+    description: "Terraform state files"
+    
+  .hcl:
+    type: iac
+    language: hcl
+    strategy: hcl_block
+    description: "HashiCorp Configuration Language"
+
+  # CloudFormation
+  .cfn:
+    type: iac
+    language: cloudformation
+    strategy: cfn_template
+    description: "CloudFormation templates"
+
+  # Ansible
+  .ansible:
+    type: iac
+    language: ansible
+    strategy: ansible_playbook
+    description: "Ansible playbooks"
+
+  # Shell Scripts
+  .sh:
+    type: script
+    language: bash
+    strategy: shell_script
+    description: "Bash shell scripts"
+    
+  .bash:
+    type: script
+    language: bash
+    strategy: shell_script
+    description: "Bash scripts"
+    
+  .zsh:
+    type: script
+    language: zsh
+    strategy: shell_script
+    description: "Zsh shell scripts"
+    
+  .fish:
+    type: script
+    language: fish
+    strategy: shell_script
+    description: "Fish shell scripts"
+    
+  .ps1:
+    type: script
+    language: powershell
+    strategy: powershell_script
+    description: "PowerShell scripts"
+    
+  .psm1:
+    type: script
+    language: powershell
+    strategy: powershell_module
+    description: "PowerShell modules"
+    
+  .bat:
+    type: script
+    language: batch
+    strategy: batch_script
+    description: "Windows batch files"
+    
+  .cmd:
+    type: script
+    language: batch
+    strategy: batch_script
+    description: "Windows command files"
+
+  # Web Assets
+  .html:
+    type: markup
+    language: html
+    strategy: html_structure
+    description: "HTML files"
+    
+  .htm:
+    type: markup
+    language: html
+    strategy: html_structure
+    description: "HTML files"
+    
+  .css:
+    type: style
+    language: css
+    strategy: css_rules
+    description: "CSS stylesheets"
+    
+  .scss:
+    type: style
+    language: scss
+    strategy: scss_rules
+    description: "SASS stylesheets"
+    
+  .sass:
+    type: style
+    language: sass
+    strategy: sass_rules
+    description: "SASS stylesheets"
+    
+  .less:
+    type: style
+    language: less
+    strategy: less_rules
+    description: "LESS stylesheets"
+
+  # Template Files
+  .jsp:
+    type: template
+    language: jsp
+    strategy: jsp_template
+    description: "Java Server Pages"
+    
+  .jspx:
+    type: template
+    language: jsp
+    strategy: jsp_template
+    description: "JSP XML syntax"
+    
+  .ftl:
+    type: template
+    language: freemarker
+    strategy: freemarker_template
+    description: "FreeMarker templates"
+    
+  .vm:
+    type: template
+    language: velocity
+    strategy: velocity_template
+    description: "Velocity templates"
+    
+  .tpl:
+    type: template
+    language: template
+    strategy: generic_template
+    description: "Generic template files"
+    
+  .ejs:
+    type: template
+    language: ejs
+    strategy: ejs_template
+    description: "EJS templates"
+    
+  .hbs:
+    type: template
+    language: handlebars
+    strategy: handlebars_template
+    description: "Handlebars templates"
+    
+  .mustache:
+    type: template
+    language: mustache
+    strategy: mustache_template
+    description: "Mustache templates"
+
+  # Testing Files
+  .feature:
+    type: test
+    language: gherkin
+    strategy: gherkin_scenario
+    description: "Cucumber/Gherkin feature files"
+    
+  .spec:
+    type: test
+    language: spec
+    strategy: spec_test
+    description: "Specification test files"
+
+  # Documentation
+  .md:
+    type: docs
+    language: markdown
+    strategy: markdown_section
+    description: "Markdown documentation"
+    
+  .mdx:
+    type: docs
+    language: mdx
+    strategy: mdx_section
+    description: "MDX documentation"
+    
+  .rst:
+    type: docs
+    language: restructuredtext
+    strategy: rst_section
+    description: "reStructuredText documentation"
+    
+  .adoc:
+    type: docs
+    language: asciidoc
+    strategy: adoc_section
+    description: "AsciiDoc documentation"
+    
+  .tex:
+    type: docs
+    language: latex
+    strategy: latex_section
+    description: "LaTeX documents"
+
+  # Data Files
+  .csv:
+    type: data
+    language: csv
+    strategy: skip_or_sample
+    description: "CSV data files"
+    
+  .tsv:
+    type: data
+    language: tsv
+    strategy: skip_or_sample
+    description: "Tab-separated values"
+    
+  .psv:
+    type: data
+    language: psv
+    strategy: skip_or_sample
+    description: "Pipe-separated values"
+    
+  .parquet:
+    type: data
+    language: parquet
+    strategy: skip
+    description: "Parquet data files"
+    
+  .avro:
+    type: data
+    language: avro
+    strategy: skip
+    description: "Avro data files"
+    
+  .orc:
+    type: data
+    language: orc
+    strategy: skip
+    description: "ORC data files"
+    
+  .jsonl:
+    type: data
+    language: jsonlines
+    strategy: jsonl_lines
+    description: "JSON Lines files"
+    
+  .ndjson:
+    type: data
+    language: ndjson
+    strategy: jsonl_lines
+    description: "Newline-delimited JSON"
+
+  # Archive Files
+  .zip:
+    type: archive
+    language: zip
+    strategy: skip
+    description: "ZIP archives"
+    
+  .tar:
+    type: archive
+    language: tar
+    strategy: skip
+    description: "TAR archives"
+    
+  .gz:
+    type: archive
+    language: gzip
+    strategy: skip
+    description: "GZIP compressed files"
+    
+  .jar:
+    type: archive
+    language: jar
+    strategy: skip
+    description: "Java JAR files"
+    
+  .war:
+    type: archive
+    language: war
+    strategy: skip
+    description: "Java WAR files"
+    
+  .ear:
+    type: archive
+    language: ear
+    strategy: skip
+    description: "Java EAR files"
+
+  # Binary Files
+  .class:
+    type: binary
+    language: java-bytecode
+    strategy: skip
+    description: "Java class files"
+    
+  .pyc:
+    type: binary
+    language: python-bytecode
+    strategy: skip
+    description: "Python compiled files"
+    
+  .exe:
+    type: binary
+    language: executable
+    strategy: skip
+    description: "Windows executables"
+    
+  .dll:
+    type: binary
+    language: library
+    strategy: skip
+    description: "Dynamic Link Libraries"
+    
+  .so:
+    type: binary
+    language: library
+    strategy: skip
+    description: "Shared objects"
+    
+  .dylib:
+    type: binary
+    language: library
+    strategy: skip
+    description: "macOS dynamic libraries"
+
+  # Image Files
+  .png:
+    type: image
+    language: image
+    strategy: skip
+    description: "PNG images"
+    
+  .jpg:
+    type: image
+    language: image
+    strategy: skip
+    description: "JPEG images"
+    
+  .jpeg:
+    type: image
+    language: image
+    strategy: skip
+    description: "JPEG images"
+    
+  .gif:
+    type: image
+    language: image
+    strategy: skip
+    description: "GIF images"
+    
+  .svg:
+    type: image
+    language: svg
+    strategy: svg_structure
+    description: "SVG vector graphics"
+    
+  .ico:
+    type: image
+    language: image
+    strategy: skip
+    description: "Icon files"
+
+  # Document Files
+  .pdf:
+    type: document
+    language: pdf
+    strategy: skip
+    description: "PDF documents"
+    
+  .doc:
+    type: document
+    language: word
+    strategy: skip
+    description: "Word documents"
+    
+  .docx:
+    type: document
+    language: word
+    strategy: skip
+    description: "Word documents"
+    
+  .xls:
+    type: document
+    language: excel
+    strategy: skip
+    description: "Excel spreadsheets"
+    
+  .xlsx:
+    type: document
+    language: excel
+    strategy: skip
+    description: "Excel spreadsheets"
+
+  # Log Files
+  .log:
+    type: log
+    language: log
+    strategy: log_structured
+    description: "Log files"
+    
+  .out:
+    type: log
+    language: output
+    strategy: log_structured
+    description: "Output files"
+    
+  .err:
+    type: log
+    language: error
+    strategy: log_structured
+    description: "Error logs"
+
+  # Other Code Files
+  .c:
+    type: code
+    language: c
+    strategy: c_semantic
+    description: "C source files"
+    
+  .cpp:
+    type: code
+    language: cpp
+    strategy: cpp_semantic
+    description: "C++ source files"
+    
+  .cc:
+    type: code
+    language: cpp
+    strategy: cpp_semantic
+    description: "C++ source files"
+    
+  .h:
+    type: code
+    language: c-header
+    strategy: header_semantic
+    description: "C/C++ header files"
+    
+  .hpp:
+    type: code
+    language: cpp-header
+    strategy: header_semantic
+    description: "C++ header files"
+    
+  .cs:
+    type: code
+    language: csharp
+    strategy: csharp_semantic
+    description: "C# source files"
+    
+  .fs:
+    type: code
+    language: fsharp
+    strategy: fsharp_semantic
+    description: "F# source files"
+    
+  .go:
+    type: code
+    language: go
+    strategy: go_semantic
+    description: "Go source files"
+    
+  .rs:
+    type: code
+    language: rust
+    strategy: rust_semantic
+    description: "Rust source files"
+    
+  .swift:
+    type: code
+    language: swift
+    strategy: swift_semantic
+    description: "Swift source files"
+    
+  .rb:
+    type: code
+    language: ruby
+    strategy: ruby_semantic
+    description: "Ruby source files"
+    
+  .php:
+    type: code
+    language: php
+    strategy: php_semantic
+    description: "PHP source files"
+    
+  .r:
+    type: code
+    language: r
+    strategy: r_semantic
+    description: "R source files"
+    
+  .R:
+    type: code
+    language: r
+    strategy: r_semantic
+    description: "R source files"
+    
+  .m:
+    type: code
+    language: matlab
+    strategy: matlab_semantic
+    description: "MATLAB files"
+    
+  .lua:
+    type: code
+    language: lua
+    strategy: lua_semantic
+    description: "Lua scripts"
+    
+  .pl:
+    type: code
+    language: perl
+    strategy: perl_semantic
+    description: "Perl scripts"
+    
+  .ex:
+    type: code
+    language: elixir
+    strategy: elixir_semantic
+    description: "Elixir source files"
+    
+  .exs:
+    type: code
+    language: elixir
+    strategy: elixir_semantic
+    description: "Elixir scripts"
+    
+  .erl:
+    type: code
+    language: erlang
+    strategy: erlang_semantic
+    description: "Erlang source files"
+    
+  .dart:
+    type: code
+    language: dart
+    strategy: dart_semantic
+    description: "Dart source files"
+
+# Specific file name mappings - takes precedence over extensions
+filenames:
+  # Build Files - Maven
+  pom.xml:
+    type: build
+    language: maven
+    strategy: maven_pom
+    description: "Maven Project Object Model"
+    
+  settings.xml:
+    type: build
+    language: maven
+    strategy: maven_settings
+    description: "Maven settings"
+
+  # Build Files - Gradle
+  build.gradle:
+    type: build
+    language: gradle
+    strategy: gradle_build
+    description: "Gradle build script"
+    
+  build.gradle.kts:
+    type: build
+    language: gradle-kotlin
+    strategy: gradle_kotlin
+    description: "Gradle Kotlin DSL"
+    
+  settings.gradle:
+    type: build
+    language: gradle
+    strategy: gradle_settings
+    description: "Gradle settings"
+    
+  settings.gradle.kts:
+    type: build
+    language: gradle-kotlin
+    strategy: gradle_settings_kotlin
+    description: "Gradle settings Kotlin DSL"
+    
+  gradle.properties:
+    type: build
+    language: gradle
+    strategy: properties_kv
+    description: "Gradle properties"
+
+  # Build Files - Node/NPM
+  package.json:
+    type: build
+    language: npm
+    strategy: package_json
+    description: "NPM package configuration"
+    
+  package-lock.json:
+    type: build
+    language: npm
+    strategy: skip
+    description: "NPM lock file"
+    
+  yarn.lock:
+    type: build
+    language: yarn
+    strategy: skip
+    description: "Yarn lock file"
+    
+  pnpm-lock.yaml:
+    type: build
+    language: pnpm
+    strategy: skip
+    description: "PNPM lock file"
+
+  # Build Files - Python
+  setup.py:
+    type: build
+    language: python
+    strategy: python_setup
+    description: "Python setup script"
+    
+  setup.cfg:
+    type: build
+    language: python
+    strategy: ini_sections
+    description: "Python setup configuration"
+    
+  pyproject.toml:
+    type: build
+    language: python
+    strategy: toml_structure
+    description: "Python project configuration"
+    
+  requirements.txt:
+    type: build
+    language: python
+    strategy: requirements_list
+    description: "Python requirements"
+    
+  Pipfile:
+    type: build
+    language: python
+    strategy: toml_structure
+    description: "Pipenv configuration"
+    
+  Pipfile.lock:
+    type: build
+    language: python
+    strategy: skip
+    description: "Pipenv lock file"
+
+  # Build Files - Ruby
+  Gemfile:
+    type: build
+    language: ruby
+    strategy: gemfile
+    description: "Ruby gem dependencies"
+    
+  Gemfile.lock:
+    type: build
+    language: ruby
+    strategy: skip
+    description: "Ruby gem lock file"
+
+  # Build Files - Others
+  Makefile:
+    type: build
+    language: make
+    strategy: makefile
+    description: "Make build file"
+    
+  makefile:
+    type: build
+    language: make
+    strategy: makefile
+    description: "Make build file"
+    
+  CMakeLists.txt:
+    type: build
+    language: cmake
+    strategy: cmake_lists
+    description: "CMake configuration"
+    
+  Rakefile:
+    type: build
+    language: ruby
+    strategy: rakefile
+    description: "Ruby make file"
+    
+  webpack.config.js:
+    type: build
+    language: webpack
+    strategy: webpack_config
+    description: "Webpack configuration"
+    
+  rollup.config.js:
+    type: build
+    language: rollup
+    strategy: rollup_config
+    description: "Rollup configuration"
+    
+  vite.config.js:
+    type: build
+    language: vite
+    strategy: vite_config
+    description: "Vite configuration"
+
+  # CI/CD Files
+  .travis.yml:
+    type: ci
+    language: travis
+    strategy: yaml_structure
+    description: "Travis CI configuration"
+    
+  .gitlab-ci.yml:
+    type: ci
+    language: gitlab
+    strategy: yaml_structure
+    description: "GitLab CI configuration"
+    
+  Jenkinsfile:
+    type: ci
+    language: jenkins
+    strategy: jenkinsfile
+    description: "Jenkins pipeline"
+    
+  azure-pipelines.yml:
+    type: ci
+    language: azure-devops
+    strategy: yaml_structure
+    description: "Azure Pipelines"
+    
+  .circleci/config.yml:
+    type: ci
+    language: circleci
+    strategy: yaml_structure
+    description: "CircleCI configuration"
+
+  # Docker Files
+  Dockerfile:
+    type: build
+    language: docker
+    strategy: dockerfile
+    description: "Docker image definition"
+    
+  docker-compose.yml:
+    type: build
+    language: docker-compose
+    strategy: docker_compose
+    description: "Docker Compose configuration"
+    
+  docker-compose.yaml:
+    type: build
+    language: docker-compose
+    strategy: docker_compose
+    description: "Docker Compose configuration"
+    
+  .dockerignore:
+    type: config
+    language: ignore
+    strategy: ignore_list
+    description: "Docker ignore patterns"
+
+  # Kubernetes Files
+  deployment.yml:
+    type: iac
+    language: kubernetes
+    strategy: k8s_manifest
+    description: "Kubernetes deployment"
+    
+  deployment.yaml:
+    type: iac
+    language: kubernetes
+    strategy: k8s_manifest
+    description: "Kubernetes deployment"
+    
+  service.yml:
+    type: iac
+    language: kubernetes
+    strategy: k8s_manifest
+    description: "Kubernetes service"
+    
+  service.yaml:
+    type: iac
+    language: kubernetes
+    strategy: k8s_manifest
+    description: "Kubernetes service"
+    
+  configmap.yml:
+    type: iac
+    language: kubernetes
+    strategy: k8s_manifest
+    description: "Kubernetes ConfigMap"
+    
+  configmap.yaml:
+    type: iac
+    language: kubernetes
+    strategy: k8s_manifest
+    description: "Kubernetes ConfigMap"
+
+  # Git Files
+  .gitignore:
+    type: config
+    language: gitignore
+    strategy: ignore_list
+    description: "Git ignore patterns"
+    
+  .gitattributes:
+    type: config
+    language: gitattributes
+    strategy: attributes_list
+    description: "Git attributes"
+    
+  .gitmodules:
+    type: config
+    language: gitmodules
+    strategy: ini_sections
+    description: "Git submodules"
+
+  # Application Configuration
+  application.properties:
+    type: config
+    language: spring
+    strategy: properties_kv
+    description: "Spring Boot properties"
+    
+  application.yml:
+    type: config
+    language: spring
+    strategy: yaml_structure
+    description: "Spring Boot YAML config"
+    
+  application.yaml:
+    type: config
+    language: spring
+    strategy: yaml_structure
+    description: "Spring Boot YAML config"
+    
+  bootstrap.properties:
+    type: config
+    language: spring
+    strategy: properties_kv
+    description: "Spring Cloud properties"
+    
+  bootstrap.yml:
+    type: config
+    language: spring
+    strategy: yaml_structure
+    description: "Spring Cloud YAML"
+    
+  logback.xml:
+    type: config
+    language: logback
+    strategy: xml_structure
+    description: "Logback configuration"
+    
+  log4j.xml:
+    type: config
+    language: log4j
+    strategy: xml_structure
+    description: "Log4j configuration"
+    
+  log4j2.xml:
+    type: config
+    language: log4j2
+    strategy: xml_structure
+    description: "Log4j2 configuration"
+
+  # Database Migration Files
+  V1__init.sql:
+    type: migration
+    language: flyway
+    strategy: sql_statement
+    description: "Flyway migration"
+    
+  schema.sql:
+    type: migration
+    language: sql
+    strategy: sql_ddl
+    description: "Database schema"
+    
+  data.sql:
+    type: migration
+    language: sql
+    strategy: sql_dml
+    description: "Database seed data"
+
+  # IDE Configuration
+  .project:
+    type: ide
+    language: eclipse
+    strategy: xml_structure
+    description: "Eclipse project"
+    
+  .classpath:
+    type: ide
+    language: eclipse
+    strategy: xml_structure
+    description: "Eclipse classpath"
+    
+  .idea:
+    type: ide
+    language: intellij
+    strategy: skip
+    description: "IntelliJ IDEA settings"
+    
+  .vscode:
+    type: ide
+    language: vscode
+    strategy: skip
+    description: "VS Code settings"
+
+  # Documentation Files
+  README.md:
+    type: docs
+    language: markdown
+    strategy: markdown_section
+    description: "Project README"
+    
+  README:
+    type: docs
+    language: text
+    strategy: paragraph
+    description: "Project README"
+    
+  CHANGELOG.md:
+    type: docs
+    language: markdown
+    strategy: markdown_section
+    description: "Change log"
+    
+  LICENSE:
+    type: docs
+    language: text
+    strategy: skip
+    description: "License file"
+    
+  LICENSE.md:
+    type: docs
+    language: markdown
+    strategy: skip
+    description: "License file"
+    
+  AUTHORS:
+    type: docs
+    language: text
+    strategy: skip
+    description: "Authors file"
+    
+  CONTRIBUTORS:
+    type: docs
+    language: text
+    strategy: skip
+    description: "Contributors file"
+
+  # Test Configuration
+  jest.config.js:
+    type: test
+    language: jest
+    strategy: jest_config
+    description: "Jest configuration"
+    
+  karma.conf.js:
+    type: test
+    language: karma
+    strategy: karma_config
+    description: "Karma configuration"
+    
+  pytest.ini:
+    type: test
+    language: pytest
+    strategy: ini_sections
+    description: "Pytest configuration"
+    
+  tox.ini:
+    type: test
+    language: tox
+    strategy: ini_sections
+    description: "Tox configuration"
+
+  # Environment Files
+  .env:
+    type: config
+    language: env
+    strategy: env_vars
+    description: "Environment variables"
+    
+  .env.local:
+    type: config
+    language: env
+    strategy: env_vars
+    description: "Local environment variables"
+    
+  .env.development:
+    type: config
+    language: env
+    strategy: env_vars
+    description: "Development environment"
+    
+  .env.production:
+    type: config
+    language: env
+    strategy: env_vars
+    description: "Production environment"
+    
+  .env.test:
+    type: config
+    language: env
+    strategy: env_vars
+    description: "Test environment"
+
+# Pattern-based rules for files that don't match exact names or extensions
+patterns:
+  # Flyway migrations
+  "V[0-9]+__*.sql":
+    type: migration
+    language: flyway
+    strategy: sql_statement
+    description: "Flyway version migration"
+    
+  "U[0-9]+__*.sql":
+    type: migration
+    language: flyway
+    strategy: sql_statement
+    description: "Flyway undo migration"
+    
+  "R__*.sql":
+    type: migration
+    language: flyway
+    strategy: sql_statement
+    description: "Flyway repeatable migration"
+
+  # Test files
+  "*_test.go":
+    type: test
+    language: go
+    strategy: go_test
+    description: "Go test files"
+    
+  "*_test.py":
+    type: test
+    language: python
+    strategy: python_test
+    description: "Python test files"
+    
+  "test_*.py":
+    type: test
+    language: python
+    strategy: python_test
+    description: "Python test files"
+    
+  "*.test.js":
+    type: test
+    language: javascript
+    strategy: js_test
+    description: "JavaScript test files"
+    
+  "*.spec.js":
+    type: test
+    language: javascript
+    strategy: js_test
+    description: "JavaScript spec files"
+    
+  "*.test.ts":
+    type: test
+    language: typescript
+    strategy: ts_test
+    description: "TypeScript test files"
+    
+  "*.spec.ts":
+    type: test
+    language: typescript
+    strategy: ts_test
+    description: "TypeScript spec files"
+    
+  "*Test.java":
+    type: test
+    language: java
+    strategy: java_test
+    description: "Java test files"
+    
+  "*Tests.java":
+    type: test
+    language: java
+    strategy: java_test
+    description: "Java test files"
+    
+  "*Spec.scala":
+    type: test
+    language: scala
+    strategy: scala_test
+    description: "Scala test files"
+
+  # Configuration files
+  "*.config.js":
+    type: config
+    language: javascript
+    strategy: js_config
+    description: "JavaScript configuration"
+    
+  "*.config.ts":
+    type: config
+    language: typescript
+    strategy: ts_config
+    description: "TypeScript configuration"
+    
+  "*.conf":
+    type: config
+    language: config
+    strategy: conf_structure
+    description: "Configuration files"
+
+  # GitHub Actions
+  ".github/workflows/*.yml":
+    type: ci
+    language: github-actions
+    strategy: yaml_structure
+    description: "GitHub Actions workflow"
+    
+  ".github/workflows/*.yaml":
+    type: ci
+    language: github-actions
+    strategy: yaml_structure
+    description: "GitHub Actions workflow"
+
+# Default fallback strategies based on content analysis
+fallback_strategies:
+  # When file type cannot be determined
+  unknown_text:
+    strategy: intelligent_line
+    description: "Intelligent line-based chunking"
+    
+  unknown_code:
+    strategy: code_generic
+    description: "Generic code chunking"
+    
+  unknown_config:
+    strategy: config_generic
+    description: "Generic config chunking"
+    
+  unknown_data:
+    strategy: data_structured
+    description: "Structured data chunking"
+    
+  unknown_binary:
+    strategy: skip
+    description: "Skip binary files"
+
+# Processing rules
+processing_rules:
+  # Maximum file size to process (in bytes)
+  max_file_size: 10485760  # 10MB
+  
+  # Minimum file size to process (in bytes)
+  min_file_size: 1
+  
+  # Skip hidden files
+  skip_hidden: false
+  
+  # Skip empty files
+  skip_empty: true
+  
+  # Process symlinks
+  follow_symlinks: false
+  
+  # Default encoding
+  default_encoding: utf-8
+  
+  # Encoding detection confidence threshold
+  encoding_confidence_threshold: 0.7
+
+# Chunking strategy configurations
+strategy_configs:
+  java_semantic:
+    extract_imports: true
+    extract_package: true
+    extract_javadoc: true
+    split_methods: true
+    split_inner_classes: true
+    max_method_tokens: 300
+    
+  sql_statement:
+    split_by_semicolon: true
+    group_transactions: true
+    extract_table_names: true
+    preserve_comments: true
+    
+  xml_structure:
+    preserve_hierarchy: true
+    max_depth: 5
+    split_large_elements: true
+    
+  terraform_resource:
+    group_by_resource: true
+    extract_variables: true
+    extract_outputs: true
+    
+  markdown_section:
+    split_by_headers: true
+    preserve_code_blocks: true
+    max_section_tokens: 400

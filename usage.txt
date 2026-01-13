@@ -1,0 +1,63 @@
+# Basic analysis
+python scripts/analyze_repo.py /path/to/repo
+
+# Generate all report formats
+python scripts/analyze_repo.py /path/to/repo --format all
+
+# Generate HTML report with visualizations
+python scripts/analyze_repo.py /path/to/repo --format html
+
+# Include detailed file information
+python scripts/analyze_repo.py /path/to/repo --include-files --format csv
+
+# Verbose output
+python scripts/analyze_repo.py /path/to/repo -v
+
+# Custom output directory
+python scripts/analyze_repo.py /path/to/repo -o custom/reports
+
+
+DOWNLOAD_MODEL.py
+# First-time setup - download required models
+python scripts/download_models.py
+
+# Download all models including optional ones
+python scripts/download_models.py --all
+
+# Download specific models
+python scripts/download_models.py -m codebert-base -m graphcodebert
+
+# Force re-download (if corrupted)
+python scripts/download_models.py --force
+
+# Verify existing models
+python scripts/download_models.py --check-only
+
+# Clean up old versions to save space
+python scripts/download_models.py --cleanup
+
+# Custom cache directory
+python scripts/download_models.py --cache-dir /path/to/cache
+
+# Generate offline config for air-gapped environments
+python scripts/download_models.py --offline-config
+
+# Test downloaded models
+python scripts/test_models.py
+
+
+```
+
+## Complete Utils Directory Structure:
+```
+utils/
+├── __init__.py
+├── serialization.py      # Chunk serialization (JSON, Pickle, MessagePack, etc.)
+├── metrics.py            # Metrics collection and aggregation
+├── similarity.py         # Code similarity calculations
+├── monitoring.py         # Health checks and system monitoring
+├── notifications.py      # Alert and notification system
+├── graph_utils.py        # Graph analysis utilities
+├── file_utils.py         # File operations (optional)
+├── cache_utils.py        # Caching utilities (optional)
+└── logger_utils.py       # Logging configuration (optional)
