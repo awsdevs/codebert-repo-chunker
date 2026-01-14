@@ -32,7 +32,8 @@ from src.classifiers.file_classifier import FileClassifier, FileClassification
 from src.classifiers.content_analyzer import ContentAnalyzer
 from src.classifiers.pattern_detector import PatternDetector
 from src.embeddings.codebert_encoder import CodeBERTEncoder, EncoderConfig
-from src.embeddings.embedding_storage import EmbeddingStorage, StorageConfig
+#from src.embeddings.embedding_storage import EmbeddingStorage, StorageConfig
+from src.storage.storage_manager import StorageManager
 from src.utils.metrics import MetricsCollector
 
 logger = logging.getLogger(__name__)
@@ -217,7 +218,8 @@ class ChunkProcessor:
             compression="gzip" if self.config.enable_compression else "none",
             enable_versioning=True
         )
-        self.storage = EmbeddingStorage(storage_config)
+        #self.storage = EmbeddingStorage(storage_config)
+        self.storage = StorageManager(self.config.output_path)
         
         # Metrics collector
         self.metrics = MetricsCollector()
@@ -611,28 +613,58 @@ class ChunkProcessor:
         
         return embeddings_map
     
+#    def _store_embeddings_batch(self,
+#                               chunks_map: Dict[Path, List[Chunk]],
+#                               embeddings_map: Dict[Path, List[np.ndarray]]):
+#        """Store embeddings in storage backend"""
+#        with self.metrics.measure_time("embedding_storage"):
+#            for file_path, chunks in chunks_map.items():
+#                embeddings = embeddings_map.get(file_path, [])
+#                
+#                for chunk, embedding in zip(chunks, embeddings):
+#                    try:
+#                        # Store in database
+#                        self.storage.store(
+#                            chunk_id=chunk.id,
+#                            embedding=embedding,
+#                            file_path=str(file_path),
+#                            model_name=self.config.model_name,
+#                            language=chunk.metadata.language,
+#                            chunk_type=chunk.chunk_type.value,
+#                            chunk_size=len(chunk.content)
+#                        )
+#                    except Exception as e:
+#                        logger.error(f"Failed to store embedding: {e}")
     def _store_embeddings_batch(self,
-                               chunks_map: Dict[Path, List[Chunk]],
-                               embeddings_map: Dict[Path, List[np.ndarray]]):
-        """Store embeddings in storage backend"""
-        with self.metrics.measure_time("embedding_storage"):
-            for file_path, chunks in chunks_map.items():
-                embeddings = embeddings_map.get(file_path, [])
+                                chunks_map: Dict[Path, List[Chunk]],
+                                embeddings_map: Dict[Path, List[np.ndarray]]):
+            """Store embeddings, content, and metadata using unified StorageManager"""
+            with self.metrics.measure_time("embedding_storage"):
+                all_chunks = []
+                all_embeddings = []
                 
-                for chunk, embedding in zip(chunks, embeddings):
+                for file_path, chunks in chunks_map.items():
+                    embeddings = embeddings_map.get(file_path, [])
+                    
+                    # Robust alignment check
+                    if len(chunks) != len(embeddings):
+                        logger.error(f"Alignment error for {file_path}: {len(chunks)} chunks vs {len(embeddings)} embeddings")
+                        # Fallback: store what we can or skip
+                        continue
+                        
+                    # Assign embeddings to chunks (in memory update)
+                    for chunk, embedding in zip(chunks, embeddings):
+                        chunk.embedding = embedding
+                        
+                    all_chunks.extend(chunks)
+                    all_embeddings.extend(embeddings)
+
+                if all_chunks:
                     try:
-                        # Store in database
-                        self.storage.store(
-                            chunk_id=chunk.id,
-                            embedding=embedding,
-                            file_path=str(file_path),
-                            model_name=self.config.model_name,
-                            language=chunk.metadata.language,
-                            chunk_type=chunk.chunk_type.value,
-                            chunk_size=len(chunk.content)
-                        )
+                        # Single atomic-like batch save
+                        self.storage.batch_save(all_chunks, all_embeddings)
                     except Exception as e:
-                        logger.error(f"Failed to store embedding: {e}")
+                        logger.error(f"Failed to store batch of {len(all_chunks)} chunks: {e}")
     
     def _build_search_index(self):
         """Build search index for embeddings"""
