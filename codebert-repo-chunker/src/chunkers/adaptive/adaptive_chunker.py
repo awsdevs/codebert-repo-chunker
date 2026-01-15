@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import logging
 
-from src.core.base_chunker import BaseChunker, Chunk
+from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from src.utils.text_utils import TextAnalyzer
 from config.settings import settings
@@ -396,7 +396,7 @@ class AdaptiveChunker(BaseChunker):
     """Main adaptive chunker that handles unknown file types"""
     
     def __init__(self, tokenizer, max_tokens: int = 450):
-        super().__init__(tokenizer, max_tokens)
+        super().__init__(tokenizer, ChunkerConfig(max_tokens=max_tokens))
         self.content_analyzer = ContentAnalyzer()
         self.chunk_strategies = {
             'code_block': self._chunk_code_blocks,

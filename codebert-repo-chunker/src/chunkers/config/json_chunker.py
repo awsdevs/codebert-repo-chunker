@@ -14,7 +14,7 @@ from enum import Enum
 from decimal import Decimal
 import math
 
-from src.core.base_chunker import BaseChunker, Chunk
+from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from config.settings import settings
 
@@ -733,7 +733,7 @@ class JSONChunker(BaseChunker):
     """Chunker specialized for JSON files"""
     
     def __init__(self, tokenizer, max_tokens: int = 450):
-        super().__init__(tokenizer, max_tokens)
+        super().__init__(tokenizer, ChunkerConfig(max_tokens=max_tokens))
         self.analyzer = JSONAnalyzer(tokenizer)
         
         # Chunking strategies

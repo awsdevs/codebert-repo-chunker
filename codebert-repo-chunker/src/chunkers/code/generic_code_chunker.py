@@ -15,7 +15,7 @@ from pygments.lexers import get_lexer_for_filename, guess_lexer, get_lexer_by_na
 from pygments.token import Token
 from pygments.util import ClassNotFound
 
-from src.core.base_chunker import BaseChunker, Chunk
+from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from config.settings import settings
 
@@ -512,7 +512,7 @@ class GenericCodeChunker(BaseChunker):
     """Generic code chunker for any programming language"""
     
     def __init__(self, tokenizer, max_tokens: int = 450):
-        super().__init__(tokenizer, max_tokens)
+        super().__init__(tokenizer, ChunkerConfig(max_tokens=max_tokens))
         self.pattern_detector = SyntaxPatternDetector()
         self.indentation_analyzer = IndentationAnalyzer()
         self.bracket_tracker = BracketTracker()
@@ -602,8 +602,8 @@ class GenericCodeChunker(BaseChunker):
         
         # Add metadata from lexer
         for chunk in chunks:
-            chunk.metadata['language'] = lexer.name
-            chunk.metadata['lexer_tokens'] = len(tokens)
+            chunk.metadata.annotations['language'] = lexer.name
+            chunk.metadata.annotations['lexer_tokens'] = len(tokens)
         
         return chunks
     

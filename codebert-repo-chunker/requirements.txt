@@ -227,8 +227,9 @@ python-json-logger==2.0.7
 
 # Debugging
 ipython==8.19.0
-ipdb==0.13.13
-pdbpp==0.10.3
+ipathspec>=0.9.0
+# pdbpp removed due to conflict with torch
+
 
 # ============================================================================
 # TESTING
@@ -371,4 +372,5 @@ pipenv==2023.11.17
 # Jupyter Support
 # jupyter==1.0.0
 # jupyterlab==4.0.10
-# notebook==7.0.6
+# notebook==7.0.6python-hcl2==7.3.1
+xmlschema

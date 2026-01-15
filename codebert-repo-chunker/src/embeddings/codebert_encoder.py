@@ -6,6 +6,8 @@ Provides efficient encoding with batching, caching, and optimization
 import torch
 import torch.nn as nn
 import numpy as np
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from transformers import (
     RobertaTokenizer, 
     RobertaModel,

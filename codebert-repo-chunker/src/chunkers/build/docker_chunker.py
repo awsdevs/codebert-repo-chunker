@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict, OrderedDict
 import logging
 
-from src.core.base_chunker import BaseChunker, Chunk
+from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from src.utils.yaml_utils import YAMLProcessor
 from config.settings import settings
@@ -723,7 +723,7 @@ class DockerChunker(BaseChunker):
     """Chunker for Docker-related files"""
     
     def __init__(self, tokenizer, max_tokens: int = 450):
-        super().__init__(tokenizer, max_tokens)
+        super().__init__(tokenizer, ChunkerConfig(max_tokens=max_tokens))
         self.dockerfile_analyzer = DockerfileAnalyzer()
         self.compose_analyzer = DockerComposeAnalyzer()
     

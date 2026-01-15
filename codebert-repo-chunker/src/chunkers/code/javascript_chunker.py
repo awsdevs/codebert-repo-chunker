@@ -14,7 +14,7 @@ from enum import Enum
 import esprima
 import subprocess
 
-from src.core.base_chunker import BaseChunker, Chunk
+from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from config.settings import settings
 
@@ -392,7 +392,7 @@ class JavaScriptAnalyzer:
             end_column=node.loc.end.column if hasattr(node, 'loc') else 0,
             is_exported=False,
             is_default=False,
-            is_async=node.value.async if hasattr(node.value, 'async') else False,
+            is_async=getattr(node.value, 'async') if hasattr(node.value, 'async') else False,
             is_generator=node.value.generator if hasattr(node.value, 'generator') else False,
             parameters=self._extract_parameters(node.value),
             return_type=None,
@@ -421,8 +421,8 @@ class JavaScriptAnalyzer:
     def _extract_function(self, node: Any, module: JSModule, content: str):
         """Extract function declaration"""
         function_element = JSElement(
-            element_type=JSElementType.ASYNC_FUNCTION if node.async else 
-                        JSElementType.GENERATOR if node.generator else 
+            element_type=JSElementType.ASYNC_FUNCTION if getattr(node, 'async', False) else 
+                        JSElementType.GENERATOR if getattr(node, 'generator', False) else 
                         JSElementType.FUNCTION,
             name=node.id.name if hasattr(node, 'id') and node.id else 'anonymous',
             content=self._get_node_content(node, content),
@@ -432,8 +432,8 @@ class JavaScriptAnalyzer:
             end_column=node.loc.end.column if hasattr(node, 'loc') else 0,
             is_exported=False,
             is_default=False,
-            is_async=node.async if hasattr(node, 'async') else False,
-            is_generator=node.generator if hasattr(node, 'generator') else False,
+            is_async=getattr(node, 'async') if hasattr(node, 'async') else False,
+            is_generator=getattr(node, 'generator') if hasattr(node, 'generator') else False,
             parameters=self._extract_parameters(node),
             return_type=None,
             decorators=[],
@@ -471,7 +471,7 @@ class JavaScriptAnalyzer:
                         end_column=node.loc.end.column if hasattr(node, 'loc') else 0,
                         is_exported=False,
                         is_default=False,
-                        is_async=declarator.init.async if hasattr(declarator.init, 'async') else False,
+                        is_async=getattr(declarator.init, 'async', False) if hasattr(declarator.init, 'async') else False,
                         is_generator=False,
                         parameters=self._extract_parameters(declarator.init),
                         return_type=None,
@@ -1076,7 +1076,7 @@ class JavaScriptChunker(BaseChunker):
     """Chunker specialized for JavaScript/TypeScript files"""
     
     def __init__(self, tokenizer, max_tokens: int = 450):
-        super().__init__(tokenizer, max_tokens)
+        super().__init__(tokenizer, ChunkerConfig(max_tokens=max_tokens))
         self.analyzer = JavaScriptAnalyzer()
         
     def chunk(self, content: str, file_context: FileContext) -> List[Chunk]:

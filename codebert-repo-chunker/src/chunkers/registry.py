@@ -74,7 +74,7 @@ class ChunkerRegistry:
         self._register_builtin_chunkers()
         
         # Load custom chunkers if configured
-        if settings.get('enable_custom_chunkers', False):
+        if getattr(settings, 'enable_custom_chunkers', False):
             self._load_custom_chunkers()
     
     def _load_config(self):
@@ -153,7 +153,7 @@ class ChunkerRegistry:
                     'description': 'PL/SQL chunker for Oracle database objects'
                 },
                 'xml': {
-                    'module': 'src.chunkers.markup.xml_chunker',
+                    'module': 'src.chunkers.config.xml_chunker',
                     'class': 'XMLChunker',
                     'extensions': ['.xml', '.xsd', '.xslt', '.wsdl', '.svg'],
                     'patterns': ['*.xml'],
@@ -162,7 +162,7 @@ class ChunkerRegistry:
                     'description': 'XML chunker with namespace support'
                 },
                 'maven': {
-                    'module': 'src.chunkers.config.maven_chunker',
+                    'module': 'src.chunkers.build.maven_chunker',
                     'class': 'MavenChunker',
                     'extensions': [],
                     'patterns': [],
@@ -207,7 +207,7 @@ class ChunkerRegistry:
                     'description': 'Terraform HCL chunker'
                 },
                 'docker': {
-                    'module': 'src.chunkers.config.docker_chunker',
+                    'module': 'src.chunkers.build.docker_chunker',
                     'class': 'DockerChunker',
                     'extensions': [],
                     'patterns': ['Dockerfile*', 'docker-compose*.yml'],
@@ -215,15 +215,7 @@ class ChunkerRegistry:
                     'priority': 'pattern_match',
                     'description': 'Docker and Docker Compose chunker'
                 },
-                'markdown': {
-                    'module': 'src.chunkers.docs.markdown_chunker',
-                    'class': 'MarkdownChunker',
-                    'extensions': ['.md', '.markdown', '.mkd'],
-                    'patterns': ['*.md', 'README*'],
-                    'filenames': ['README.md', 'CHANGELOG.md', 'CONTRIBUTING.md'],
-                    'priority': 'extension',
-                    'description': 'Markdown chunker with header hierarchy'
-                },
+
                 'generic_code': {
                     'module': 'src.chunkers.code.generic_code_chunker',
                     'class': 'GenericCodeChunker',
@@ -235,15 +227,7 @@ class ChunkerRegistry:
                     'priority': 'extension',
                     'description': 'Generic code chunker for multiple languages'
                 },
-                'text': {
-                    'module': 'src.chunkers.text.text_chunker',
-                    'class': 'TextChunker',
-                    'extensions': ['.txt', '.text', '.log', '.out', '.err'],
-                    'patterns': ['*.txt', '*.log'],
-                    'filenames': [],
-                    'priority': 'fallback',
-                    'description': 'Generic text file chunker'
-                },
+
                 'adaptive': {
                     'module': 'src.chunkers.adaptive.adaptive_chunker',
                     'class': 'AdaptiveChunker',
@@ -590,10 +574,10 @@ class ChunkerRegistry:
         # Create file context
         file_context = FileContext(
             path=file_path,
+            name=file_path.name,
+            extension=file_path.suffix.lower(),
             content=content,
-            encoding='utf-8',
-            size=len(content),
-            lines=content.count('\n') + 1
+            size=len(content)
         )
         
         # Get appropriate chunker
