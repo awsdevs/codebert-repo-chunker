@@ -122,6 +122,25 @@ class ChunkProcessor:
         try:
             print(f"DEBUG: Chunking {file_path}")
             chunks = self.registry.chunk_file(file_path, content=content)
+            # Enrich with dependencies if possible
+            if file_path.suffix == '.py':
+                try:
+                    # Simple regex extraction for now to verify storage
+                    import re
+                    imports = []
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if line.startswith('import ') or line.startswith('from '):
+                            imports.append(line)
+                    
+                    if imports:
+                        print(f"DEBUG: Found {len(imports)} imports for {file_path}")
+                        for chunk in chunks:
+                            chunk.dependencies = list(set(imports)) # De-duplicate
+                            
+                except Exception as e:
+                    logger.warning(f"Dependency extraction failed for {file_path}: {e}")
+                
         except Exception as e:
             logger.error(f"Chunking failed for {file_path}: {e}")
             return []
