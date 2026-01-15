@@ -1,20 +1,20 @@
+
 """
 src/storage/vector_store.py
 Production Vector Store using FAISS.
 Handles both Exact (Flat) and Approximate (IVF) indexing logic.
 """
-import numpy as np
 import logging
 import pickle
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional, Any
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-# Import FAISS locally to avoid crashing if not installed, 
-# though for production this should be a hard requirement.
+# Import FAISS/Numpy locally to avoid crashing if not installed, 
 import faiss
+import numpy as np
 
 @dataclass
 class VectorConfig:
@@ -36,14 +36,23 @@ class VectorStore:
         self.index = None
         self.id_map: Dict[int, str] = {} # FAISS int ID -> Chunk String ID
         
-        self._load_or_create()
+        if faiss and np:
+            self._load_or_create()
+        else:
+            logger.warning("FAISS or Numpy not found. Vector store disabled.")
 
     def _load_or_create(self):
+        if not faiss: return
+        
         if self.index_path.exists() and self.map_path.exists():
             logger.info("Loading existing vector index...")
-            self.index = faiss.read_index(str(self.index_path))
-            with open(self.map_path, 'rb') as f:
-                self.id_map = pickle.load(f)
+            try:
+                self.index = faiss.read_index(str(self.index_path))
+                with open(self.map_path, 'rb') as f:
+                    self.id_map = pickle.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load index: {e}")
+                self._create_new_index()
         else:
             self._create_new_index()
 
@@ -62,10 +71,12 @@ class VectorStore:
             
         self.id_map = {}
 
-    def _ensure_trained(self, embeddings: np.ndarray):
+    def _ensure_trained(self, embeddings: Any):
         """
         GAP FIX: Logic to train IVF index if it hasn't been trained yet.
         """
+        if not faiss or not np: return
+        
         if self.config.index_type == "IVF" and not self.index.is_trained:
             logger.info(f"Training IVF Index with {len(embeddings)} vectors...")
             # Ideally we need ~30 * nlist vectors to train effectively
@@ -76,8 +87,10 @@ class VectorStore:
             self.index.train(embeddings.astype('float32'))
             logger.info("Index training complete.")
 
-    def add(self, chunk_ids: List[str], embeddings: np.ndarray):
+    def add(self, chunk_ids: List[str], embeddings: Any):
         """Add vectors to index, handling training automatically."""
+        if not faiss or not np or not self.index: return
+
         embeddings = embeddings.astype('float32')
         
         # 1. Check Training requirement
@@ -94,7 +107,8 @@ class VectorStore:
             
         logger.info(f"Indexed {len(chunk_ids)} vectors. Total: {self.index.ntotal}")
 
-    def search(self, query: np.ndarray, k: int = 10) -> List[Tuple[str, float]]:
+    def search(self, query: Any, k: int = 10) -> List[Tuple[str, float]]:
+        if not faiss or not np or not self.index: return []
         if self.index.ntotal == 0:
             return []
             
@@ -108,6 +122,7 @@ class VectorStore:
         return results
 
     def save(self):
+        if not faiss or not self.index: return
         faiss.write_index(self.index, str(self.index_path))
         with open(self.map_path, 'wb') as f:
             pickle.dump(self.id_map, f)

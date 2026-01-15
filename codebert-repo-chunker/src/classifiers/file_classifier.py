@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 from enum import Enum
 import json
-import yaml
+try:
+    import yaml
+except ImportError:
+    yaml = None
 import hashlib
 from datetime import datetime
 import logging

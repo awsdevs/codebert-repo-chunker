@@ -16,183 +16,25 @@ import re
 from collections import defaultdict
 import time
 
+from src.core.chunk_model import Chunk, ChunkLocation, ChunkType
+
 logger = logging.getLogger(__name__)
 
-class ChunkType(Enum):
-    """Standard chunk types across all chunkers"""
-    # Code chunks
-    CLASS = "class"
-    FUNCTION = "function"
-    METHOD = "method"
-    MODULE = "module"
-    INTERFACE = "interface"
-    ENUM = "enum"
-    
-    # Documentation chunks
-    DOCSTRING = "docstring"
-    COMMENT = "comment"
-    README = "readme"
-    
-    # Configuration chunks
-    CONFIG = "config"
-    SCHEMA = "schema"
-    METADATA = "metadata"
-    
-    # Data chunks
-    DATA = "data"
-    QUERY = "query"
-    MIGRATION = "migration"
-    
-    # Test chunks
-    TEST_CLASS = "test_class"
-    TEST_FUNCTION = "test_function"
-    TEST_FIXTURE = "test_fixture"
-    
-    # Generic chunks
-    SECTION = "section"
-    BLOCK = "block"
-    FRAGMENT = "fragment"
-    COMPLETE = "complete"
-    PARTIAL = "partial"
-    UNKNOWN = "unknown"
+# Removed Duplicate ChunkType, ChunkMetadata, ChunkRelation, Chunk classes
+# We use src.core.chunk_model.Chunk
+# Since ChunkType in chunk_model might determine types, we need to ensure compatibility.
+# For now, we reuse strings if needed, or rely on ChunkType from chunk_model.
 
+# If we need ChunkRelationType, we should import or define it. 
+# BaseChunker used ChunkRelationType(Enum).
 class ChunkRelationType(Enum):
     """Types of relationships between chunks"""
     PARENT = "parent"
     CHILD = "child"
-    SIBLING = "sibling"
-    IMPORTS = "imports"
-    IMPORTED_BY = "imported_by"
-    CALLS = "calls"
-    CALLED_BY = "called_by"
-    INHERITS = "inherits"
-    INHERITED_BY = "inherited_by"
-    IMPLEMENTS = "implements"
-    IMPLEMENTED_BY = "implemented_by"
-    REFERENCES = "references"
-    REFERENCED_BY = "referenced_by"
-    TESTS = "tests"
-    TESTED_BY = "tested_by"
     DEPENDS_ON = "depends_on"
-    DEPENDENCY_OF = "dependency_of"
-
-@dataclass
-class ChunkMetadata:
-    """Metadata associated with a chunk"""
-    language: Optional[str] = None
-    framework: Optional[str] = None
-    complexity: Optional[float] = None
-    importance: Optional[float] = None
-    version: Optional[str] = None
-    author: Optional[str] = None
-    created_at: Optional[datetime] = None
-    modified_at: Optional[datetime] = None
-    tags: List[str] = field(default_factory=list)
-    annotations: Dict[str, Any] = field(default_factory=dict)
-    metrics: Dict[str, float] = field(default_factory=dict)
-    dependencies: List[str] = field(default_factory=list)
-    exports: List[str] = field(default_factory=list)
-    patterns: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-
-@dataclass
-class ChunkRelation:
-    """Represents a relationship between chunks"""
-    source_chunk_id: str
-    target_chunk_id: str
-    relation_type: ChunkRelationType
-    strength: float = 1.0  # Strength of relationship (0-1)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-@dataclass
-class Chunk:
-    """Represents a semantic chunk of code or content"""
-    id: str
-    content: str
-    chunk_type: ChunkType
-    file_path: str
-    start_line: int
-    end_line: int
-    start_char: Optional[int] = None
-    end_char: Optional[int] = None
-    parent_id: Optional[str] = None
-    children_ids: List[str] = field(default_factory=list)
-    metadata: ChunkMetadata = field(default_factory=ChunkMetadata)
-    relations: List[ChunkRelation] = field(default_factory=list)
-    token_count: Optional[int] = None
-    char_count: Optional[int] = None
-    line_count: Optional[int] = None
-    hash: Optional[str] = None
-    embedding: Optional[List[float]] = None
-    score: Optional[float] = None
-    
-    def __post_init__(self):
-        """Calculate derived fields after initialization"""
-        if not self.hash:
-            self.hash = self._calculate_hash()
-        if not self.char_count:
-            self.char_count = len(self.content)
-        if not self.line_count:
-            self.line_count = self.content.count('\n') + 1
-    
-    def _calculate_hash(self) -> str:
-        """Calculate content hash"""
-        return hashlib.sha256(self.content.encode('utf-8')).hexdigest()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert chunk to dictionary"""
-        result = {
-            'id': self.id,
-            'content': self.content,
-            'chunk_type': self.chunk_type.value,
-            'file_path': self.file_path,
-            'start_line': self.start_line,
-            'end_line': self.end_line,
-            'start_char': self.start_char,
-            'end_char': self.end_char,
-            'parent_id': self.parent_id,
-            'children_ids': self.children_ids,
-            'metadata': asdict(self.metadata),
-            'relations': [asdict(r) for r in self.relations],
-            'token_count': self.token_count,
-            'char_count': self.char_count,
-            'line_count': self.line_count,
-            'hash': self.hash,
-            'score': self.score
-        }
-        
-        # Don't include embedding by default (too large)
-        if self.embedding and len(self.embedding) < 100:
-            result['embedding'] = self.embedding
-            
-        return result
-    
-    def to_json(self) -> str:
-        """Convert chunk to JSON string"""
-        return json.dumps(self.to_dict(), default=str)
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Chunk':
-        """Create chunk from dictionary"""
-        # Convert chunk_type string back to enum
-        if isinstance(data.get('chunk_type'), str):
-            data['chunk_type'] = ChunkType(data['chunk_type'])
-        
-        # Convert metadata dict to ChunkMetadata
-        if isinstance(data.get('metadata'), dict):
-            data['metadata'] = ChunkMetadata(**data['metadata'])
-        
-        # Convert relations
-        if 'relations' in data:
-            relations = []
-            for rel in data['relations']:
-                if isinstance(rel, dict):
-                    if isinstance(rel.get('relation_type'), str):
-                        rel['relation_type'] = ChunkRelationType(rel['relation_type'])
-                    relations.append(ChunkRelation(**rel))
-            data['relations'] = relations
-        
-        return cls(**data)
+    CALLED_BY = "called_by"
+    CALLS = "calls"
+    IMPLEMENTS = "implements"
 
 @dataclass
 class ChunkerConfig:
@@ -261,6 +103,11 @@ class BaseChunker(ABC):
         
         # Initialize language-specific settings
         self._init_language_settings()
+    
+    @property
+    def max_tokens(self) -> int:
+        """Get max tokens from config"""
+        return self.config.max_tokens
     
     def _create_token_counter(self) -> Callable[[str], int]:
         """Create token counting function"""
@@ -361,45 +208,52 @@ class BaseChunker(ABC):
                 chunk_type = ChunkType.UNKNOWN
         
         # Generate unique chunk ID
+        # Generate unique chunk ID
         self._chunk_counter += 1
         chunk_id = f"{file_path or 'unknown'}_{chunk_type.value}_{self._chunk_counter}"
         
-        # Create metadata object
-        chunk_metadata = ChunkMetadata()
+        # Create metadata dictionary
+        # Removed ChunkMetadata class usage, using simple dict as per new ChunkModel
+        chunk_metadata = {}
         if metadata:
-            for key, value in metadata.items():
-                if hasattr(chunk_metadata, key):
-                    setattr(chunk_metadata, key, value)
-                else:
-                    chunk_metadata.annotations[key] = value
+            chunk_metadata.update(metadata)
         
         # Count tokens
         token_count = self.count_tokens(content)
         
+        # Create location
+        location = ChunkLocation(
+            file_path=file_path or '',
+            start_line=start_line,
+            end_line=end_line if end_line > 0 else start_line + content.count('\n'),
+            file_checksum=""
+        )
+
         # Create chunk
         chunk = Chunk(
             id=chunk_id,
             content=content,
             chunk_type=chunk_type,
-            file_path=file_path or '',
-            start_line=start_line,
-            end_line=end_line if end_line > 0 else start_line + content.count('\n'),
+            location=location,
             parent_id=parent_id,
             metadata=chunk_metadata,
-            token_count=token_count
+            stats={'token_count': token_count}
         )
+        
+        # Set warnings in metadata if needed
+        chunk.metadata.setdefault('warnings', [])
         
         # Track chunk
         self._chunks_created.append(chunk)
         self._stats['chunks_created'] += 1
-        self._stats[f'chunks_{chunk_type.value}'] += 1
+        # self._stats[f'chunks_{chunk_type.value}'] += 1 # Stats dict keys might need init
         self._stats['total_tokens'] += token_count
         
         # Check size constraints
         if token_count > self.config.max_tokens:
-            chunk.metadata.warnings.append(f"Chunk exceeds max tokens: {token_count} > {self.config.max_tokens}")
+            chunk.metadata['warnings'].append(f"Chunk exceeds max tokens: {token_count} > {self.config.max_tokens}")
         elif token_count < self.config.min_tokens:
-            chunk.metadata.warnings.append(f"Chunk below min tokens: {token_count} < {self.config.min_tokens}")
+            chunk.metadata['warnings'].append(f"Chunk below min tokens: {token_count} < {self.config.min_tokens}")
         
         return chunk
     

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import logging
 from collections import defaultdict
 
-from src.core.base_chunker import BaseChunker, Chunk
+from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from src.utils.xml_utils import XMLProcessor, XMLNamespaceHandler
 from config.settings import settings
@@ -143,7 +143,7 @@ class MavenStructureAnalyzer:
     
     def _extract_parent(self, root: ET.Element, ns: Dict[str, str]) -> Optional[Dict[str, str]]:
         """Extract parent POM information"""
-        parent = root.find('parent' if not ns else f"{{{ns['']}}parent")
+        parent = root.find('parent' if not ns else f"{{{ns['']}}}parent")
         
         if parent is not None:
             return {
@@ -158,10 +158,10 @@ class MavenStructureAnalyzer:
     def _extract_modules(self, root: ET.Element, ns: Dict[str, str]) -> List[str]:
         """Extract module list"""
         modules = []
-        modules_elem = root.find('modules' if not ns else f"{{{ns['']}}modules")
+        modules_elem = root.find('modules' if not ns else f"{{{ns['']}}}modules")
         
         if modules_elem is not None:
-            for module in modules_elem.findall('module' if not ns else f"{{{ns['']}}module"):
+            for module in modules_elem.findall('module' if not ns else f"{{{ns['']}}}module"):
                 if module.text:
                     modules.append(module.text)
         
@@ -170,7 +170,7 @@ class MavenStructureAnalyzer:
     def _extract_properties(self, root: ET.Element, ns: Dict[str, str]) -> Dict[str, str]:
         """Extract properties"""
         properties = {}
-        props_elem = root.find('properties' if not ns else f"{{{ns['']}}properties")
+        props_elem = root.find('properties' if not ns else f"{{{ns['']}}}properties")
         
         if props_elem is not None:
             for prop in props_elem:
@@ -183,10 +183,10 @@ class MavenStructureAnalyzer:
     def _extract_dependencies(self, root: ET.Element, ns: Dict[str, str]) -> List[Dict[str, Any]]:
         """Extract dependencies"""
         dependencies = []
-        deps_elem = root.find('dependencies' if not ns else f"{{{ns['']}}dependencies")
+        deps_elem = root.find('dependencies' if not ns else f"{{{ns['']}}}dependencies")
         
         if deps_elem is not None:
-            for dep in deps_elem.findall('dependency' if not ns else f"{{{ns['']}}dependency"):
+            for dep in deps_elem.findall('dependency' if not ns else f"{{{ns['']}}}dependency"):
                 dependency = {
                     'groupId': self._get_text(dep, 'groupId', ns),
                     'artifactId': self._get_text(dep, 'artifactId', ns),
@@ -199,9 +199,9 @@ class MavenStructureAnalyzer:
                 
                 # Extract exclusions
                 exclusions = []
-                exclusions_elem = dep.find('exclusions' if not ns else f"{{{ns['']}}exclusions")
+                exclusions_elem = dep.find('exclusions' if not ns else f"{{{ns['']}}}exclusions")
                 if exclusions_elem is not None:
-                    for excl in exclusions_elem.findall('exclusion' if not ns else f"{{{ns['']}}exclusion"):
+                    for excl in exclusions_elem.findall('exclusion' if not ns else f"{{{ns['']}}}exclusion"):
                         exclusions.append({
                             'groupId': self._get_text(excl, 'groupId', ns),
                             'artifactId': self._get_text(excl, 'artifactId', ns)
@@ -218,12 +218,12 @@ class MavenStructureAnalyzer:
                                       ns: Dict[str, str]) -> List[Dict[str, Any]]:
         """Extract dependency management section"""
         dependencies = []
-        mgmt_elem = root.find('dependencyManagement' if not ns else f"{{{ns['']}}dependencyManagement")
+        mgmt_elem = root.find('dependencyManagement' if not ns else f"{{{ns['']}}}dependencyManagement")
         
         if mgmt_elem is not None:
-            deps_elem = mgmt_elem.find('dependencies' if not ns else f"{{{ns['']}}dependencies")
+            deps_elem = mgmt_elem.find('dependencies' if not ns else f"{{{ns['']}}}dependencies")
             if deps_elem is not None:
-                for dep in deps_elem.findall('dependency' if not ns else f"{{{ns['']}}dependency"):
+                for dep in deps_elem.findall('dependency' if not ns else f"{{{ns['']}}}dependency"):
                     dependencies.append({
                         'groupId': self._get_text(dep, 'groupId', ns),
                         'artifactId': self._get_text(dep, 'artifactId', ns),
@@ -237,12 +237,12 @@ class MavenStructureAnalyzer:
     def _extract_plugins(self, root: ET.Element, ns: Dict[str, str]) -> List[Dict[str, Any]]:
         """Extract build plugins"""
         plugins = []
-        build_elem = root.find('build' if not ns else f"{{{ns['']}}build")
+        build_elem = root.find('build' if not ns else f"{{{ns['']}}}build")
         
         if build_elem is not None:
-            plugins_elem = build_elem.find('plugins' if not ns else f"{{{ns['']}}plugins")
+            plugins_elem = build_elem.find('plugins' if not ns else f"{{{ns['']}}}plugins")
             if plugins_elem is not None:
-                for plugin in plugins_elem.findall('plugin' if not ns else f"{{{ns['']}}plugin"):
+                for plugin in plugins_elem.findall('plugin' if not ns else f"{{{ns['']}}}plugin"):
                     plugin_info = {
                         'groupId': self._get_text(plugin, 'groupId', ns) or 'org.apache.maven.plugins',
                         'artifactId': self._get_text(plugin, 'artifactId', ns),
@@ -250,15 +250,15 @@ class MavenStructureAnalyzer:
                     }
                     
                     # Extract configuration
-                    config_elem = plugin.find('configuration' if not ns else f"{{{ns['']}}configuration")
+                    config_elem = plugin.find('configuration' if not ns else f"{{{ns['']}}}configuration")
                     if config_elem is not None:
                         plugin_info['configuration'] = self._element_to_dict(config_elem)
                     
                     # Extract executions
                     executions = []
-                    exec_elem = plugin.find('executions' if not ns else f"{{{ns['']}}executions")
+                    exec_elem = plugin.find('executions' if not ns else f"{{{ns['']}}}executions")
                     if exec_elem is not None:
-                        for execution in exec_elem.findall('execution' if not ns else f"{{{ns['']}}execution"):
+                        for execution in exec_elem.findall('execution' if not ns else f"{{{ns['']}}}execution"):
                             executions.append({
                                 'id': self._get_text(execution, 'id', ns),
                                 'phase': self._get_text(execution, 'phase', ns),
@@ -275,10 +275,10 @@ class MavenStructureAnalyzer:
     def _extract_profiles(self, root: ET.Element, ns: Dict[str, str]) -> List[Dict[str, Any]]:
         """Extract profiles"""
         profiles = []
-        profiles_elem = root.find('profiles' if not ns else f"{{{ns['']}}profiles")
+        profiles_elem = root.find('profiles' if not ns else f"{{{ns['']}}}profiles")
         
         if profiles_elem is not None:
-            for profile in profiles_elem.findall('profile' if not ns else f"{{{ns['']}}profile"):
+            for profile in profiles_elem.findall('profile' if not ns else f"{{{ns['']}}}profile"):
                 profile_info = {
                     'id': self._get_text(profile, 'id', ns),
                     'activation': {},
@@ -288,12 +288,12 @@ class MavenStructureAnalyzer:
                 }
                 
                 # Extract activation
-                activation = profile.find('activation' if not ns else f"{{{ns['']}}activation")
+                activation = profile.find('activation' if not ns else f"{{{ns['']}}}activation")
                 if activation is not None:
                     profile_info['activation'] = self._element_to_dict(activation)
                 
                 # Extract profile properties
-                props = profile.find('properties' if not ns else f"{{{ns['']}}properties")
+                props = profile.find('properties' if not ns else f"{{{ns['']}}}properties")
                 if props is not None:
                     for prop in props:
                         tag = prop.tag.split('}')[-1] if '}' in prop.tag else prop.tag
@@ -307,10 +307,10 @@ class MavenStructureAnalyzer:
     def _extract_repositories(self, root: ET.Element, ns: Dict[str, str]) -> List[Dict[str, Any]]:
         """Extract repository configurations"""
         repositories = []
-        repos_elem = root.find('repositories' if not ns else f"{{{ns['']}}repositories")
+        repos_elem = root.find('repositories' if not ns else f"{{{ns['']}}}repositories")
         
         if repos_elem is not None:
-            for repo in repos_elem.findall('repository' if not ns else f"{{{ns['']}}repository"):
+            for repo in repos_elem.findall('repository' if not ns else f"{{{ns['']}}}repository"):
                 repo_info = {
                     'id': self._get_text(repo, 'id', ns),
                     'name': self._get_text(repo, 'name', ns),
@@ -320,7 +320,7 @@ class MavenStructureAnalyzer:
                 
                 # Extract snapshots/releases policies
                 for policy_type in ['snapshots', 'releases']:
-                    policy = repo.find(policy_type if not ns else f"{{{ns['']}}{policy_type}")
+                    policy = repo.find(policy_type if not ns else f"{{{ns['']}}}{policy_type}")
                     if policy is not None:
                         repo_info[policy_type] = {
                             'enabled': self._get_text(policy, 'enabled', ns) == 'true',
@@ -369,7 +369,7 @@ class MavenChunker(BaseChunker):
     """Chunker specialized for Maven POM files"""
     
     def __init__(self, tokenizer, max_tokens: int = 450):
-        super().__init__(tokenizer, max_tokens)
+        super().__init__(tokenizer, ChunkerConfig(max_tokens=max_tokens))
         self.analyzer = MavenStructureAnalyzer()
         
         # Section priorities for chunking

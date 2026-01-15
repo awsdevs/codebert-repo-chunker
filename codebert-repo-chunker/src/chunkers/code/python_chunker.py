@@ -14,7 +14,7 @@ from enum import Enum
 import tokenize
 import io
 
-from src.core.base_chunker import BaseChunker, Chunk
+from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from config.settings import settings
 
@@ -33,6 +33,7 @@ class PythonElementType(Enum):
     STATIC_METHOD = "static_method"
     CLASS_METHOD = "class_method"
     DECORATOR = "decorator"
+    CONSTRUCTOR = "constructor"
     GENERATOR = "generator"
     ASYNC_GENERATOR = "async_generator"
     LAMBDA = "lambda"
@@ -715,7 +716,7 @@ class PythonChunker(BaseChunker):
     """Chunker specialized for Python source files"""
     
     def __init__(self, tokenizer, max_tokens: int = 450):
-        super().__init__(tokenizer, max_tokens)
+        super().__init__(tokenizer, ChunkerConfig(max_tokens=max_tokens))
         self.analyzer = PythonASTAnalyzer()
         
     def chunk(self, content: str, file_context: FileContext) -> List[Chunk]:
@@ -769,9 +770,10 @@ class PythonChunker(BaseChunker):
             
             # Add metadata about the module to all chunks
             for chunk in chunks:
-                chunk.metadata['module_name'] = module.module_name
-                chunk.metadata['is_package'] = module.is_package
-                chunk.metadata['frameworks'] = list(module.frameworks)
+                chunk.metadata['annotations'] = chunk.metadata.get('annotations', {})
+                chunk.metadata['annotations']['module_name'] = module.module_name
+                chunk.metadata['annotations']['is_package'] = module.is_package
+                chunk.metadata['annotations']['frameworks'] = list(module.frameworks)
             
             logger.info(f"Created {len(chunks)} chunks for Python file {file_context.path}")
             

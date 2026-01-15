@@ -1,0 +1,21 @@
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.DS_Store
+.idea/
+.vscode/
+reports/
+data/
+output/
+# Debug/Test Scripts
+verify_pipeline.py
+test_encoder.py
+
+# Logs
+*.log

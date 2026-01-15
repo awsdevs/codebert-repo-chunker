@@ -1,50 +1,170 @@
-"""
-src/storage/storage_manager.py
-Unified Facade for Pipeline.
-"""
-from pathlib import Path
-from typing import List, Dict, Any
-import numpy as np
-import logging
 
-from src.storage.chunk_storage import ChunkStorage, StorageConfig
+from typing import Dict, Any, List, Optional, Union, Generator
+from enum import Enum
+from pathlib import Path
+from dataclasses import dataclass
+import logging
+import json
+import shutil
+
+import numpy as np
+
+from src.core.chunk_model import Chunk
+from src.storage.chunk_storage import ChunkStorage, StorageConfig as ChunkStorageConfig
 from src.storage.metadata_store import MetadataStore, MetadataConfig
+
 from src.storage.vector_store import VectorStore, VectorConfig
 
 logger = logging.getLogger(__name__)
 
+class DeploymentEnvironment(Enum):
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
+
+@dataclass
+class StorageConfig:
+    """Configuration for storage backend"""
+    environment: DeploymentEnvironment = DeploymentEnvironment.DEVELOPMENT
+    base_path: Path = Path("data")
+    primary_backend: str = "sqlite"  # sqlite, postgres, mongo
+    enable_caching: bool = True
+    enable_vector_search: bool = True
+    
+    def __post_init__(self):
+        self.base_path = Path(self.base_path)
+        
+class StorageFactory:
+    """Factory for creating storage managers"""
+    
+    @staticmethod
+    def create(config: StorageConfig) -> 'StorageManager':
+        # Ensure base path exists
+        config.base_path.mkdir(parents=True, exist_ok=True)
+        return StorageManager(config)
+
 class StorageManager:
-    def __init__(self, workspace: Path):
-        self.chunk_store = ChunkStorage(StorageConfig(workspace / "chunks"))
-        self.meta_store = MetadataStore(MetadataConfig(workspace / "metadata"))
-        # Default to Flat for reliability. Change to "IVF" and set ivf_nlist for scale.
-        self.vector_store = VectorStore(VectorConfig(workspace / "vectors", index_type="Flat"))
-
-    def batch_store(self, chunk_ids: List[str], contents: List[str], 
-                   metadatas: List[Dict], embeddings: List[np.ndarray]):
-        """Atomic-like batch storage of all components"""
+    """
+    Unified interface for all storage operations.
+    Coordinating Chunk, Metadata, and Vector storage.
+    """
+    
+    def __init__(self, config: StorageConfig):
+        self.config = config
+        self._init_backends()
         
-        if not (len(chunk_ids) == len(contents) == len(metadatas) == len(embeddings)):
-            logger.error("Length mismatch in batch store")
-            return
-
-        # 1. Content
-        for cid, content, meta in zip(chunk_ids, contents, metadatas):
-            self.chunk_store.store(
-                chunk_id=cid, 
-                content=content, 
-                file_path=meta.get('file_path', 'unknown'),
-                language=meta.get('language', 'unknown')
+    def _init_backends(self):
+        """Initialize storage backends based on config"""
+        # 1. Chunk Storage
+        chunk_config = ChunkStorageConfig(storage_path=self.config.base_path)
+        self.chunk_storage = ChunkStorage(chunk_config)
+            
+        # 2. Metadata Storage
+        meta_config = MetadataConfig(storage_path=self.config.base_path)
+        self.metadata_store = MetadataStore(meta_config)
+        
+        # 3. Vector Storage
+        if self.config.enable_vector_search and VectorStore:
+            try:
+                vec_config = VectorConfig(storage_path=self.config.base_path / "vectors")
+                self.vector_store = VectorStore(vec_config)
+            except Exception as e:
+                logger.warning(f"Vector storage disabled: {e}")
+                self.vector_store = None
+        else:
+            self.vector_store = None
+            
+    def store_chunk(self, chunk: Chunk) -> bool:
+        """Store a chunk across all backends"""
+        try:
+            # 1. Store Content
+            self.chunk_storage.store(
+                chunk.id, 
+                chunk.content, 
+                chunk.location.file_path,
+                chunk.language
             )
-
-        # 2. Metadata
-        for cid, meta in zip(chunk_ids, metadatas):
-            self.meta_store.store(cid, meta)
-
-        # 3. Vectors (Stacked)
-        self.vector_store.add(chunk_ids, np.vstack(embeddings))
+            
+            # 2. Store Metadata
+            self.metadata_store.store(chunk.id, chunk.to_dict())
+            
+            # 3. Store Vector (if embedding exists)
+            if self.vector_store and chunk.embedding is not None and np:
+                 if isinstance(chunk.embedding, np.ndarray):
+                    self.vector_store.add([chunk.id], chunk.embedding.reshape(1, -1))
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store chunk {chunk.id}: {e}")
+            return False
+            
+    def get_chunk(self, chunk_id: str) -> Optional[Chunk]:
+        """Retrieve a complete chunk"""
+        content = self.chunk_storage.retrieve(chunk_id)
         
+        metadata = self.metadata_store.get(chunk_id) or {}
+        
+        # Need to reconstruct ChunkLocation from metadata
+        location = ChunkLocation(
+            file_path=metadata.get('file_path', ''),
+            start_line=metadata.get('start_line', 0),
+            end_line=metadata.get('end_line', 0)
+        )
+
+        return Chunk(
+            id=chunk_id,
+            content=content,
+            chunk_type=ChunkType(metadata.get('chunk_type', 'unknown')),
+            location=location,
+            language=metadata.get('language', 'unknown'),
+            metadata=metadata
+        )
+
+    def search_by_vector(self, embedding: Any, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Search for chunks using vector similarity
+        Returns hydrated results with content and metadata
+        """
+        if not self.vector_store:
+            logger.warning("Vector search disabled")
+            return []
+            
+        # 1. Get similar chunk IDs
+        results = self.vector_store.search(embedding, k=limit)
+        
+        hydrated_results = []
+        for chunk_id, score in results:
+            # 2. Get Metadata
+            metadata = self.metadata_store.get(chunk_id) or {}
+            
+            # 3. Get Content (Optional? let's include snippet)
+            content = self.chunk_storage.retrieve(chunk_id)
+            snippet = content[:200] + "..." if content else ""
+            
+            hydrated_results.append({
+                'id': chunk_id,
+                'score': float(score),
+                'file_path': metadata.get('file_path'),
+                'function_name': metadata.get('function_name'),
+                'snippet': snippet,
+                'metadata': metadata
+            })
+            
+        return hydrated_results
+
+    def save(self):
+        """Save all storage backends"""
+        logger.info(f"Saving storage to {self.config.base_path.absolute()}...")
+        if self.vector_store:
+            self.vector_store.save()
+            
+        if hasattr(self.chunk_storage, 'save'):
+            self.chunk_storage.save()
+            
+        # Metadata store saves on write, but maybe close/commit
+        if hasattr(self.metadata_store, 'save'):
+            self.metadata_store.save()
+            
     def close(self):
-        self.chunk_store.close()
-        self.meta_store.close()
-        self.vector_store.close()
+        """Close connections"""
+        self.metadata_store.close()
+        self.save()
