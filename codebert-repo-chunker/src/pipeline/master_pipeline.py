@@ -244,6 +244,19 @@ class MasterPipeline:
                 session_id = f"run_{int(time.time())}"
                 # The imports_map from _analyze_dependencies serves as the module_map
                 self._generate_reports(session_id, self.dependency_graph, module_map=self.imports_map)
+            
+            # Explicit Summary Log for User
+            repo_name = repo_path.name if 'repo_path' in locals() else "Unknown"
+            total_time = self.stats.get("duration_seconds", 0)
+            
+            logger.info("="*50)
+            logger.info("BEYOND PIPELINE SUMMARY")
+            logger.info("="*50)
+            logger.info(f"Repository:    {repo_name}")
+            logger.info(f"Total Time:    {total_time:.2f}s")
+            logger.info(f"Files Scanned: {self.stats.get('files_scanned', 0)}")
+            logger.info(f"Chunks Created: {self.stats.get('total_chunks', 0)}")
+            logger.info("="*50)
 
     def close(self):
         """Close pipeline resources"""
