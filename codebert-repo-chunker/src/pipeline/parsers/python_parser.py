@@ -18,7 +18,7 @@ class PythonParser(BaseManifestParser):
             'setup.py', 
             'pyproject.toml', 
             'Pipfile'
-        ] or file_path.name.endswith('.txt') and 'requirements' in file_path.name
+        ] or (file_path.name.endswith('.txt') and 'requirements' in file_path.name) or file_path.suffix == '.py'
 
     def parse(self, file_path: Path, content: str) -> List[Dependency]:
         filename = file_path.name
@@ -29,8 +29,41 @@ class PythonParser(BaseManifestParser):
             return self._parse_setup_py(content, filename)
         elif filename == 'pyproject.toml':
             return self._parse_pyproject(content, filename)
+        elif file_path.suffix == '.py':
+            return self._parse_python_source(content, filename)
         
         return []
+
+    def _parse_python_source(self, content: str, filename: str) -> List[Dependency]:
+        """Parse imports from python source files"""
+        deps = []
+        try:
+            # We can use AST for robustness, or regex for speed/tolerance
+            # Using simple regex to match what we did in ChunkProcessor
+            import re
+            for i, line in enumerate(content.splitlines()):
+                line = line.strip()
+                match = None
+                
+                # import x.y
+                if line.startswith('import '):
+                    match = re.match(r'^import\s+([\w\.]+)', line)
+                # from x.y import z
+                elif line.startswith('from '):
+                    match = re.match(r'^from\s+([\w\.]+)', line)
+                    
+                if match:
+                    module_name = match.group(1)
+                    deps.append(Dependency(
+                        name=module_name,
+                        version='*',
+                        type='import',
+                        source_file=filename,
+                        line_number=i+1
+                    ))
+        except Exception:
+            pass
+        return deps
 
     def _parse_requirements(self, content: str, filename: str) -> List[Dependency]:
         deps = []
