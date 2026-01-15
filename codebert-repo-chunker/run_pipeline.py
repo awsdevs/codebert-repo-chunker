@@ -95,6 +95,10 @@ def run():
     except Exception as e:
         logger.error(f"Pipeline execution failed: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        if 'pipeline' in locals():
+            pipeline.close()
+            print("Pipeline resources closed.")
 
 if __name__ == "__main__":
     run()

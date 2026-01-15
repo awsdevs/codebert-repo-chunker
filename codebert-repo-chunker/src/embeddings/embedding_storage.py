@@ -398,7 +398,8 @@ class SQLiteMetadataStore:
                 metadata.chunk_size,
                 metadata.hash,
                 json.dumps(metadata.tags),
-                json.dumps(metadata.metadata)
+                # Enforce no content in shadow writer
+                json.dumps({k: v for k, v in metadata.metadata.items() if k not in ['content', 'embedding']})
             ))
             self.conn.commit()
     

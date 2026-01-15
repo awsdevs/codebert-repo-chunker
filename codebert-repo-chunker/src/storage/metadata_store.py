@@ -45,7 +45,17 @@ class MetadataStore:
         self.conn.commit()
 
     def store(self, chunk_id: str, metadata: Dict[str, Any]):
+        """Store metadata for a chunk"""
         try:
+            # Enforce removal of heavy fields to prevent redundancy
+            # This catches cases where callers bypass StorageManager
+            if isinstance(metadata, dict):
+                # Don't modify original dict in case caller needs it
+                metadata = metadata.copy()
+                metadata.pop('content', None)
+                metadata.pop('embedding', None)
+
+            # Store as JSON
             json_str = json.dumps(metadata, default=str)
             file_path = metadata.get('file_path', '')
             repo = metadata.get('repository', '')

@@ -84,8 +84,11 @@ class StorageManager:
                 chunk.language
             )
             
-            # 2. Store Metadata
-            self.metadata_store.store(chunk.id, chunk.to_dict())
+            # 2. Store Metadata (Strip large fields)
+            metadata_payload = chunk.to_dict()
+            metadata_payload.pop('content', None)
+            metadata_payload.pop('embedding', None)
+            self.metadata_store.store(chunk.id, metadata_payload)
             
             # 3. Store Vector (if embedding exists)
             if self.vector_store and chunk.embedding is not None and np:
