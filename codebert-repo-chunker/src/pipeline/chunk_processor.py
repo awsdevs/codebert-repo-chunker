@@ -89,9 +89,14 @@ class ChunkProcessor:
         
         if self.encoder and chunks:
              # Extract chunks that need embedding (if any weren't done in process_file)
-             pass 
-
+            pass 
+            
         return chunks
+
+    def close(self):
+        """Close resources"""
+        if self.storage_manager:
+            self.storage_manager.close()
 
     def process_file(self, file_path: Union[Path, str]) -> List[Chunk]:
         """Process a single file: Classify -> Chunk -> Embed -> Store"""
