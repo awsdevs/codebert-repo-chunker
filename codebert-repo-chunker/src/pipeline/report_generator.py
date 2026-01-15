@@ -66,7 +66,47 @@ class ReportGenerator:
             
         return md
 
-    def generate_html_report(self, stats: Dict[str, Any], dependency_graph: Dict[str, Any], session_id: str) -> Path:
+    def generate_report(self, stats: Dict[str, Any], dependency_graph: Dict[str, Any], module_map: Dict[str, str] = None) -> Path:
+        """
+        Generate all report formats.
+        Returns path to the primary report (markdown).
+        """
+        session_id = f"{stats.get('start_time', datetime.now(timezone.utc)).strftime('%H%M%S')}_{stats.get('scan_id', 'unknown')}"
+        
+        # Ensure output directory exists
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate HTML first (interactive)
+        self.generate_html_report(stats, dependency_graph, session_id, module_map=module_map)
+        
+        # Graph is expected to be {node: [deps]}
+        if dependency_graph:
+            processed_nodes = set()
+            for source, targets in dependency_graph.items():
+                # 1. JSON Report (Machine Readable)
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                report_base = self.output_dir / f"report_{timestamp}_{session_id}"
+                json_path = report_base.with_suffix(".json")
+                try:
+                    with open(json_path, 'w') as f:
+                        json.dump(stats, f, indent=2, default=str)
+                except Exception as e:
+                    logger.error(f"Failed to write JSON report: {e}")
+                
+                # 2. Markdown Report (Human Readable)
+                md_path = report_base.with_suffix(".md")
+                try:
+                    markdown = self._format_markdown(stats, session_id, timestamp)
+                    with open(md_path, 'w') as f:
+                        f.write(markdown)
+                    logger.info(f"Report generated at {md_path}")
+                    return md_path
+                except Exception as e:
+                    logger.error(f"Failed to write Markdown report: {e}")
+                    return json_path
+        return Path("") # Should not be reached if dependency_graph is processed or if generate is called
+
+    def generate_html_report(self, stats: Dict[str, Any], dependency_graph: Dict[str, Any], session_id: str, module_map: Dict[str, str] = None) -> Path:
         """
         Generate an interactive HTML report using vis.js
         """
@@ -82,17 +122,28 @@ class ReportGenerator:
             processed_nodes = set()
             for source, targets in dependency_graph.items():
                 if source not in processed_nodes:
+                    # Source is always a file path ID
                     nodes.append({"id": source, "label": Path(source).name, "group": "source"})
                     processed_nodes.add(source)
                     
                 for target_dict in targets:
-                    target = target_dict.get('name')
-                    if not target: continue
+                    target_name = target_dict.get('name')
+                    if not target_name: continue
                     
-                    if target not in processed_nodes:
-                        nodes.append({"id": target, "label": target, "group": "dependency"})
-                        processed_nodes.add(target)
-                    edges.append({"from": source, "to": target, "arrows": "to"})
+                    # Resolve target to file path if possible
+                    target_id = target_name
+                    group = "dependency"
+                    
+                    if module_map and target_name in module_map:
+                        target_id = module_map[target_name]
+                        group = "source" # It's a known source file
+                        
+                    if target_id not in processed_nodes:
+                        label = target_name if group == "dependency" else Path(target_id).name
+                        nodes.append({"id": target_id, "label": label, "group": group})
+                        processed_nodes.add(target_id)
+                        
+                    edges.append({"from": source, "to": target_id, "arrows": "to"})
 
         html_content = f"""
 <!DOCTYPE html>

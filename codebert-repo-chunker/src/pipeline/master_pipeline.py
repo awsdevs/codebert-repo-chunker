@@ -175,8 +175,10 @@ class MasterPipeline:
             return {}, {}
             
         logger.info("Analyzing dependencies...")
-        results = self.dependency_resolver.analyze_repository(file_paths)
-        return results["dependency_graph"], results["imports_map"]
+        requests = self.dependency_resolver.analyze_repository(file_paths)
+        # Store full result for report generator
+        self.dependency_data = requests
+        return requests.get("graph", {}), requests.get("imports", {})
 
     def _analyze_quality(self, chunks_dir: Path):
         """Quality Analysis phase"""
@@ -208,7 +210,9 @@ class MasterPipeline:
             self.stats["files_scanned"] = len(files)
             
             # 2. Dependencies
-            self._analyze_dependencies(files)
+            dep_result = self._analyze_dependencies(files)
+            self.dependency_data = dep_result
+            self.dependency_graph = dep_result.get('graph', {}) if dep_result else {}
             
             # 3. Process (Chunk & Embed)
             # In a real run, this would be:
@@ -234,6 +238,12 @@ class MasterPipeline:
         finally:
             duration = datetime.now(timezone.utc) - self.start_time
             self.stats["duration_seconds"] = duration.total_seconds()
+            
+            # 5. Report - Moved to finally block to ensure it runs even on failure
+            if self.report_generator:
+                session_id = f"run_{int(time.time())}"
+                # The imports_map from _analyze_dependencies serves as the module_map
+                self._generate_reports(session_id, self.dependency_graph, module_map=self.imports_map)
 
     def close(self):
         """Close pipeline resources"""
