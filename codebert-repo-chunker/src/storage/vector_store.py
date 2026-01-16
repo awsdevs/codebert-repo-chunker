@@ -35,6 +35,7 @@ class VectorStore:
         
         self.index = None
         self.id_map: Dict[int, str] = {} # FAISS int ID -> Chunk String ID
+        self.reverse_map: Dict[str, int] = {} # Chunk String ID -> FAISS int ID
         self.next_id = 0 # Explicit ID counter
         
         if faiss and np:
@@ -52,7 +53,7 @@ class VectorStore:
                 with open(self.map_path, 'rb') as f:
                     data = pickle.load(f)
                     if isinstance(data, dict):
-                        # Backward compatibility or simple format
+                        # Backward compatibility
                         self.id_map = data
                         self.next_id = max(self.id_map.keys()) + 1 if self.id_map else 0
                     elif isinstance(data, tuple) and len(data) == 2:
@@ -61,6 +62,10 @@ class VectorStore:
                     else:
                         self.id_map = {}
                         self.next_id = 0
+                
+                # Rebuild reverse map for O(1) lookups
+                self.reverse_map = {v: k for k, v in self.id_map.items()}
+                        
             except Exception as e:
                 logger.error(f"Failed to load index: {e}")
                 self._create_new_index()
@@ -81,20 +86,34 @@ class VectorStore:
             # IVF requires a quantizer (Flat) and training
             quantizer = faiss.IndexFlatIP(self.config.dimension)
             # IVF automatically supports removal if nlist is small, but standard practice ensures IDMap
-            self.index = faiss.IndexIVFFlat(quantizer, self.config.dimension, self.config.ivf_nlist, faiss.METRIC_INNER_PRODUCT)
+            ivf_index = faiss.IndexIVFFlat(quantizer, self.config.dimension, self.config.ivf_nlist, faiss.METRIC_INNER_PRODUCT)
+            self.index = faiss.IndexIDMap(ivf_index)
         else:
             raise ValueError(f"Unsupported index type: {self.config.index_type}")
             
         self.id_map = {}
+        self.reverse_map = {}
         self.next_id = 0
+
+    def _get_underlying_index(self):
+        """
+        Get the underlying index for operations like training.
+        IndexIDMap wraps the real index, so we need to access .index for training.
+        """
+        if hasattr(self.index, 'index'):
+            return self.index.index
+        return self.index
 
     def _ensure_trained(self, embeddings: Any):
         """
-        GAP FIX: Logic to train IVF index if it hasn't been trained yet.
+        Train IVF index if it hasn't been trained yet.
+        Must access underlying index since IndexIDMap wrapper doesn't expose training.
         """
         if not faiss or not np: return
         
-        if self.config.index_type == "IVF" and not self.index.is_trained:
+        underlying = self._get_underlying_index()
+        
+        if self.config.index_type == "IVF" and hasattr(underlying, 'is_trained') and not underlying.is_trained:
             logger.info(f"Training IVF Index with {len(embeddings)} vectors...")
             # Ideally we need ~30 * nlist vectors to train effectively
             min_train = self.config.ivf_nlist * 30
@@ -103,7 +122,7 @@ class VectorStore:
             
             # Normalize for Cosine Similarity training
             faiss.normalize_L2(embeddings)
-            self.index.train(embeddings.astype('float32'))
+            underlying.train(embeddings.astype('float32'))
             logger.info("Index training complete.")
 
     def add(self, chunk_ids: List[str], embeddings: Any):
@@ -115,7 +134,8 @@ class VectorStore:
         faiss.normalize_L2(embeddings)
         
         # 1. Check Training requirement
-        if not self.index.is_trained:
+        underlying = self._get_underlying_index()
+        if hasattr(underlying, 'is_trained') and not underlying.is_trained:
             self._ensure_trained(embeddings)
         
         # 2. Add to Index with explicit IDs
@@ -132,7 +152,9 @@ class VectorStore:
         
         # 3. Update ID Map
         for i, chunk_id in enumerate(chunk_ids):
-            self.id_map[int(ids[i])] = chunk_id
+            fid = int(ids[i])
+            self.id_map[fid] = chunk_id
+            self.reverse_map[chunk_id] = fid
             
         self.next_id += n
             
@@ -142,8 +164,11 @@ class VectorStore:
         """Remove vectors by chunk ID"""
         if not faiss or not self.index: return
 
-        # Reverse lookup: chunk_id -> faiss_id
-        faiss_ids_to_remove = [k for k, v in self.id_map.items() if v in chunk_ids]
+        # O(1) Reverse lookup using map
+        faiss_ids_to_remove = []
+        for cid in chunk_ids:
+            if cid in self.reverse_map:
+                faiss_ids_to_remove.append(self.reverse_map[cid])
         
         if not faiss_ids_to_remove:
             return
@@ -152,9 +177,14 @@ class VectorStore:
             ids_array = np.array(faiss_ids_to_remove, dtype=np.int64)
             n_removed = self.index.remove_ids(ids_array)
             if n_removed > 0:
-                # Clean up id_map
+                # Clean up maps
                 for fid in faiss_ids_to_remove:
-                    del self.id_map[fid]
+                    if fid in self.id_map:
+                        cid = self.id_map[fid]
+                        del self.id_map[fid]
+                        if cid in self.reverse_map:
+                            del self.reverse_map[cid]
+                            
                 logger.info(f"Removed {n_removed} vectors from index.")
             else:
                 logger.warning("remove_ids called but FAISS reported 0 removals.")
