@@ -45,23 +45,23 @@ def demo_search():
     print("\n--- Complex Scenario Verification ---")
     
     # Scenario: Hybrid Search check
-    # We want to find usages of 'ConfigLoader.load_config'
-    target_file = "src/pipeline/master_pipeline.py"
-    complex_query = "ConfigLoader.load_config"
-    print(f"Verifying FTS can find code pattern: '{complex_query}'")
+    # We want to find 'Logger' using FTS
+    target_file = "src/utils/logger.py"
+    complex_query = "Logger"
+    print(f"Verifying FTS can find definition: '{complex_query}'")
     
     fts_hits = manager.search_text(complex_query, limit=5)
     found = False
     for cid, rank in fts_hits:
         m = manager.metadata_store.get(cid)
-        # Check if file path ends with master_pipeline.py (robust to absolute paths)
-        if m and m.get('location', {}).get('file_path', '').endswith('master_pipeline.py'):
+        # Check if file path ends with logger.py (robust to absolute paths)
+        if m and m.get('location', {}).get('file_path', '').endswith('logger.py'):
             found = True
-            print(f"SUCCESS: Found pattern {complex_query} in {m['location']['file_path']}")
+            print(f"SUCCESS: Found {complex_query} in {m['location']['file_path']}")
             break
             
     if not found:
-        print(f"FAILURE: Could not find pattern {complex_query} in master_pipeline.py")
+        print(f"FAILURE: Could not find {complex_query} in logger.py")
         print("Top FTS results were:")
         for cid, rank in fts_hits:
             m = manager.metadata_store.get(cid)
