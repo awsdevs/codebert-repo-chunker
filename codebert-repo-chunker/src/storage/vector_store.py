@@ -16,6 +16,13 @@ logger = get_logger(__name__)
 import faiss
 import numpy as np
 
+# Prevent OpenMP/Threading conflicts when running in ThreadPoolExecutor
+# FAISS + OpenMP + Python Threads = Segfault
+try:
+    faiss.omp_set_num_threads(1)
+except:
+    pass
+
 @dataclass
 class VectorConfig:
     storage_path: Path = Path("storage/vectors")
