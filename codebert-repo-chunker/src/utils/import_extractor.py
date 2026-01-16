@@ -16,6 +16,14 @@ class ImportExtractor:
     Uses AST parsing where possible (Python) and robust regex for others.
     """
     
+    SUPPORTED_LANGUAGES = {
+        '.py', 
+        '.java', 
+        '.js', '.jsx', '.ts', '.tsx', 
+        '.go', 
+        '.c', '.cpp', '.h', '.hpp'
+    }
+    
     @staticmethod
     def extract_imports(content: str, language: str) -> List[str]:
         """
