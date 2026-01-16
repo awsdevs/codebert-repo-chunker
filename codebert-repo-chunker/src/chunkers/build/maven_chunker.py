@@ -9,7 +9,7 @@ from xml.dom import minidom
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Set
 from dataclasses import dataclass
-import logging
+from src.utils.logger import get_logger
 from collections import defaultdict
 
 from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
@@ -17,7 +17,7 @@ from src.core.file_context import FileContext
 from src.utils.xml_utils import XMLProcessor, XMLNamespaceHandler
 from config.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class MavenElement:

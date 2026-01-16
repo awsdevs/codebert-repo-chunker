@@ -8,7 +8,7 @@ import inspect
 from pathlib import Path
 from typing import Dict, List, Optional, Type, Any, Tuple, Set
 from dataclasses import dataclass, field
-import logging
+from src.utils.logger import get_logger
 import yaml
 import json
 from enum import Enum
@@ -18,7 +18,7 @@ from src.core.base_chunker import BaseChunker, Chunk
 from src.core.file_context import FileContext
 from config.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class ChunkerPriority(Enum):
     """Priority levels for chunker selection"""

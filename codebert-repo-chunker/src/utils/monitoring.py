@@ -9,11 +9,11 @@ from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-import logging
+from src.utils.logger import get_logger
 import json
 import requests
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class HealthStatus(Enum):
     """Health status levels"""

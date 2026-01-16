@@ -1,10 +1,10 @@
 from typing import List, Dict, Any, Optional, Type
 from pathlib import Path
-import logging
+from src.utils.logger import get_logger
 
 from src.pipeline.parsers.base_parser import BaseManifestParser, Dependency
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class DependencyResolver:
     """
@@ -68,6 +68,33 @@ class DependencyResolver:
         graph = {} # file -> list of dependencies
         imports = {} # library -> list of files importing it
         
+        # 1. Build a map of potential module names to file paths
+        # e.g., "src.utils.metrics" -> "/abs/path/to/src/utils/metrics.py"
+        module_map = {}
+        
+        # Find the root source directory to calculate relative module names
+        # Heuristic: Use common prefix or assume 'src' is root if present
+        # strictly speaking, we should look for __init__.py but we can try simple heuristics
+        
+        # We'll map "filename_stem" -> path (weak) and "dir.filename" -> path (stronger)
+        for fp in file_paths:
+            if not fp.exists(): continue
+            
+            # map "src.utils.metrics"
+            try:
+                # varied attempts to guess python module path
+                parts = fp.parts
+                if 'src' in parts:
+                    src_index = parts.index('src')
+                    rel_parts = parts[src_index:]
+                    module_name = '.'.join(rel_parts).replace('.py', '')
+                    module_map[module_name] = str(fp)
+                
+                # Also just map the filename for simple local imports
+                module_map[fp.stem] = str(fp)
+            except Exception:
+                pass
+
         for file_path in file_paths:
             try:
                 if not file_path.exists():
@@ -90,18 +117,44 @@ class DependencyResolver:
                     
                 deps = self.resolve(file_path, content)
                 if deps:
+                    # Resolve internal dependencies
+                    resolved_deps = []
+                    for d in deps:
+                        # If this dependency matches a known internal file, point to it
+                        if d.name in module_map:
+                            # It's an internal dependency!
+                            # We can mark it or just keep the name, but for the graph logic 
+                            # (which usually uses names), we might need to handle this downstream.
+                            # actually, let's keep the dependency object but maybe add a metadata field?
+                            # Or simpler: The report generator uses the name. 
+                            # If we want the graph to connect, we need the "target" of the edge to match the "id" of the file node.
+                            # The node IDs in report_generator are str(file_path)
+                            pass
+                            
                     graph[str(file_path)] = [d.to_dict() for d in deps]
                     
                     for dep in deps:
-                        if dep.name not in imports:
-                            imports[dep.name] = []
-                        imports[dep.name].append(str(file_path))
+                        target = dep.name
+                        # Link to internal file if possible
+                        if dep.name in module_map:
+                             # This is key for the graph visualization to link nodes
+                             # The ReportGenerator likely uses 'name' as target. 
+                             # We should seemingly update the explicit dependency list passed to ReportGenerator?
+                             # Or we rely on ReportGenerator to know about this mapping?
+                             # Since ReportGenerator receives this graph, let's leave it here but maybe note it.
+                             pass
+
+                        if target not in imports:
+                            imports[target] = []
+                        imports[target].append(str(file_path))
                         
             except Exception as e:
-                logger.warning(f"Failed to analyze dependencies for {file_path}: {e}")
+                logger.error(f"Error analyzing dependencies for {file_path}: {e}")
                 
         return {
-            "dependency_graph": graph,
-            "imports_map": imports,
+            "graph": graph,
+            "imports": imports,
+            "module_map": module_map, # Return this so ReportGenerator can link them!
             "total_dependencies": sum(len(d) for d in graph.values())
         }
+

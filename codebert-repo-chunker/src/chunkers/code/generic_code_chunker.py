@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Set
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
-import logging
+from src.utils.logger import get_logger
 from enum import Enum
 import pygments
 from pygments.lexers import get_lexer_for_filename, guess_lexer, get_lexer_by_name
@@ -19,7 +19,7 @@ from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from config.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class CodePattern(Enum):
     """Common code patterns across languages"""
@@ -602,8 +602,10 @@ class GenericCodeChunker(BaseChunker):
         
         # Add metadata from lexer
         for chunk in chunks:
-            chunk.metadata.annotations['language'] = lexer.name
-            chunk.metadata.annotations['lexer_tokens'] = len(tokens)
+            if 'annotations' not in chunk.metadata:
+                chunk.metadata['annotations'] = {}
+            chunk.metadata['annotations']['language'] = lexer.name
+            chunk.metadata['annotations']['lexer_tokens'] = len(tokens)
         
         return chunks
     

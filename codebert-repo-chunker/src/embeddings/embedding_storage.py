@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
-import logging
+from src.utils.logger import get_logger
 import shutil
 import threading
 from collections import defaultdict
@@ -30,7 +30,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from abc import ABC, abstractmethod
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class StorageBackend(Enum):
     """Available storage backends"""
@@ -398,7 +398,8 @@ class SQLiteMetadataStore:
                 metadata.chunk_size,
                 metadata.hash,
                 json.dumps(metadata.tags),
-                json.dumps(metadata.metadata)
+                # Enforce no content in shadow writer
+                json.dumps({k: v for k, v in metadata.metadata.items() if k not in ['content', 'embedding']})
             ))
             self.conn.commit()
     

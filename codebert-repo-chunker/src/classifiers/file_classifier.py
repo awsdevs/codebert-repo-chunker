@@ -16,9 +16,9 @@ except ImportError:
     yaml = None
 import hashlib
 from datetime import datetime
-import logging
+from src.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class FileCategory(Enum):
     """High-level file categories"""

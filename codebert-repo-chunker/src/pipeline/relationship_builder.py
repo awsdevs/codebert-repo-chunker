@@ -13,7 +13,7 @@ import json
 import pickle
 import re
 import ast
-import logging
+from src.utils.logger import get_logger
 from collections import defaultdict, Counter
 import hashlib
 from datetime import datetime, timezone
@@ -30,7 +30,7 @@ from src.classifiers.content_analyzer import ContentAnalyzer
 from src.utils.similarity import SimilarityCalculator
 from src.utils.graph_utils import GraphAnalyzer, CommunityDetector
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class RelationshipStrength(Enum):
     """Strength levels for relationships"""

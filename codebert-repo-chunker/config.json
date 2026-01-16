@@ -1,0 +1,62 @@
+{
+    "pipeline": {
+        "description": "Core settings for the pipeline execution",
+        "environment": {
+            "value": "dev",
+            "description": "Deployment environment: 'dev' (local/sqlite) or 'prod' (server/postgres)"
+        },
+        "max_workers": {
+            "value": 4,
+            "description": "Number of concurrent worker processes for chunking/embedding"
+        },
+        "batch_size": {
+            "value": 10,
+            "description": "Number of files to process per batch loop"
+        },
+        "force_full_scan": {
+            "value": false,
+            "description": "If true, ignores incremental diffs and forces a full re-process of the repository."
+        }
+    },
+    "processing": {
+        "description": "Settings for code analysis and chunking",
+        "chunk_size": {
+            "value": 512,
+            "description": "Maximum number of tokens per text chunk (CodeBERT limit is 512)"
+        },
+        "overlap": {
+            "value": 50,
+            "description": "Number of tokens to overlap between chunks to preserve context"
+        },
+        "min_chunk_size": {
+            "value": 20,
+            "description": "Minimum characters required to create a chunk (ignores tiny snippets)"
+        },
+        "enable_embeddings": {
+            "value": true,
+            "description": "Whether to generate vector embeddings using CodeBERT (Memory intensive)"
+        }
+    },
+    "storage": {
+        "description": "Settings for data persistence",
+        "type": {
+            "value": "sqlite",
+            "description": "Primary storage backend: 'sqlite', 'postgres', or 'mongo'"
+        },
+        "base_path": {
+            "value": "data",
+            "description": "Root directory for SQLite DBs and Vector indices (Relative to project root)"
+        }
+    },
+    "monitoring": {
+        "description": "Observability settings",
+        "enabled": {
+            "value": false,
+            "description": "Enable Prometheus metrics server"
+        },
+        "port": {
+            "value": 8000,
+            "description": "Port for Prometheus metrics"
+        }
+    }
+}

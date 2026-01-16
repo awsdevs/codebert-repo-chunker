@@ -10,22 +10,16 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import yaml
 import json
 import asyncio
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
 # Integration components
-try:
-    from src.pipeline.repository_scanner import RepositoryScanner, ScannerConfig
-    from src.pipeline.dependency_resolver import DependencyResolver
-    from src.pipeline.quality_analyzer import QualityAnalyzer
-    from src.pipeline.report_generator import ReportGenerator
-except ImportError as e:
-    logging.getLogger(__name__).error(f"Failed to import core pipeline components: {e}")
-    # Define dummy classes if imports fail to avoid crash during init
-    RepositoryScanner = None
-    DependencyResolver = None
-    QualityAnalyzer = None
-    ReportGenerator = None
+# Integration components
+from src.pipeline.repository_scanner import RepositoryScanner, ScannerConfig
+from src.pipeline.dependency_resolver import DependencyResolver
+from src.pipeline.quality_analyzer import QualityAnalyzer
+from src.pipeline.report_generator import ReportGenerator
 
 # Imports for distributed processing (Celery)
 try:
@@ -42,10 +36,13 @@ except ImportError:
     PROMETHEUS_AVAILABLE = False
 
 # Imports for storage integration
+# Imports for storage integration
 from src.pipeline.chunk_processor import ChunkProcessor, ProcessingConfig
 from src.storage.storage_manager import StorageFactory, StorageConfig, DeploymentEnvironment
+from src.utils.logger import get_logger
+from src.utils.config_loader import ConfigLoader
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class PipelineConfig:
@@ -53,6 +50,7 @@ class PipelineConfig:
     env: str = "dev"
     max_workers: int = 4
     batch_size: int = 10
+    force_full_scan: bool = False
     chunk_size: int = 512
     overlap: int = 50
     storage_type: str = "sqlite"  # sqlite, postgres, mongo
@@ -60,13 +58,42 @@ class PipelineConfig:
     monitoring_port: int = 8000
     enable_distributed: bool = False
     redis_url: str = "redis://localhost:6379/0"
-    
+    enable_embeddings: bool = True # New flag to control embedding generation
+
 class MasterPipeline:
     """
     Orchestrator for the entire CodeBERT Repo Chunker pipeline.
     Manages stages: Scan -> Resolve -> Chunk -> Embed -> Store.
     """
     
+    @classmethod
+    def create_from_config(cls, config_path: str = "config.json") -> 'MasterPipeline':
+        """Factory: Create pipeline from external config file"""
+        config_data = ConfigLoader.load_config(config_path)
+        
+        # Map JSON structure to PipelineConfig flat structure
+        pipeline_settings = config_data.get('pipeline', {})
+        processing_settings = config_data.get('processing', {})
+        storage_settings = config_data.get('storage', {})
+        monitoring_settings = config_data.get('monitoring', {})
+        
+        config = PipelineConfig(
+            env=pipeline_settings.get('environment', 'dev'),
+            max_workers=pipeline_settings.get('max_workers', 4),
+            batch_size=pipeline_settings.get('batch_size', 10),
+            force_full_scan=pipeline_settings.get('force_full_scan', False),
+            
+            chunk_size=processing_settings.get('chunk_size', 512),
+            overlap=processing_settings.get('overlap', 50),
+            enable_embeddings=processing_settings.get('enable_embeddings', True),
+            
+            storage_type=storage_settings.get('type', 'sqlite'),
+            
+            enable_monitoring=monitoring_settings.get('enabled', False),
+            monitoring_port=monitoring_settings.get('port', 8000)
+        )
+        return cls(config)
+
     def __init__(self, config: PipelineConfig):
         self.config = config
         self.running = False
@@ -84,6 +111,8 @@ class MasterPipeline:
         # State
         self.input_queue = asyncio.Queue()
         self.processed_files: Set[Path] = set()
+        self.dependency_graph: Dict[str, Any] = {}
+        self.dependency_data: Dict[str, Any] = {}
         self.stats = {
             "status": "IDLE",
             "files_scanned": 0,
@@ -109,30 +138,16 @@ class MasterPipeline:
             proc_config = ProcessingConfig(
                 chunk_size=self.config.chunk_size,
                 overlap=self.config.overlap,
-                max_workers=self.config.max_workers
+                max_workers=self.config.max_workers,
+                enable_embeddings=self.config.enable_embeddings # Pass flag
             )
             self.chunk_processor = ChunkProcessor(proc_config, self.storage_manager)
             
             # 3. New Modules
-            if RepositoryScanner:
-                self.scanner = RepositoryScanner()
-            else:
-                logger.warning("RepositoryScanner not available")
-                
-            if DependencyResolver:
-                self.dependency_resolver = DependencyResolver()
-            else:
-                logger.warning("DependencyResolver not available")
-                
-            if QualityAnalyzer:
-                self.quality_analyzer = QualityAnalyzer()
-            else:
-                logger.warning("QualityAnalyzer not available")
-                
-            if ReportGenerator:
-                self.report_generator = ReportGenerator()
-            else:
-                logger.warning("ReportGenerator not available")
+            self.scanner = RepositoryScanner()
+            self.dependency_resolver = DependencyResolver()
+            self.quality_analyzer = QualityAnalyzer()
+            self.report_generator = ReportGenerator()
                 
             # 4. Monitoring
             if self.config.enable_monitoring and PROMETHEUS_AVAILABLE:
@@ -175,8 +190,10 @@ class MasterPipeline:
             return {}, {}
             
         logger.info("Analyzing dependencies...")
-        results = self.dependency_resolver.analyze_repository(file_paths)
-        return results["dependency_graph"], results["imports_map"]
+        requests = self.dependency_resolver.analyze_repository(file_paths)
+        # Store full result for report generator
+        self.dependency_data = requests
+        return requests.get("graph", {}), requests.get("imports", {})
 
     def _analyze_quality(self, chunks_dir: Path):
         """Quality Analysis phase"""
@@ -187,43 +204,131 @@ class MasterPipeline:
         # This would iterate over chunks and update their metadata
         self.quality_analyzer.analyze_directory(chunks_dir)
 
-    def _generate_reports(self, session_id: str):
+    def _generate_reports(self, session_id: str, dependency_graph: Dict[str, Any] = None, module_map: Dict[str, str] = None, repo_name: str = "unknown"):
         """Reporting phase"""
         if not self.report_generator:
             return
             
         logger.info("Generating reports...")
-        self.report_generator.generate(self.stats, session_id)
+        self.report_generator.generate_report(self.stats, dependency_graph, session_id=session_id, module_map=module_map, repo_name=repo_name)
+
+    def _compute_file_hash(self, file_path: Path) -> str:
+        """Compute SHA256 hash of a file"""
+        try:
+            sha256_hash = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                # Read in chunks to avoid memory issues
+                for byte_block in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+        except Exception as e:
+            logger.warning(f"Failed to hash {file_path}: {e}")
+            return ""
 
     def run(self, repo_path: Union[str, Path]):
         """Run the full pipeline"""
-        repo_path = Path(repo_path)
+        repo_path = Path(repo_path).resolve()
         self.start_time = datetime.now(timezone.utc)
         self.stats["start_time"] = self.start_time
         self.stats["status"] = "RUNNING"
         
         try:
-            # 1. Scan
-            files = self._scan_repository(repo_path)
-            self.stats["files_scanned"] = len(files)
+            # 1. Scan & Hash
+            all_files = self._scan_repository(repo_path)
+            self.stats["files_scanned"] = len(all_files)
             
-            # 2. Dependencies
-            self._analyze_dependencies(files)
+            # 2. Diff Logic (Diff Logic Phase 2)
+            repo_name = repo_path.name
+            current_hashes = {}
+            files_to_process = []
             
-            # 3. Process (Chunk & Embed)
-            # In a real run, this would be:
-            # chunks = self.chunk_processor.process_batch(files)
-            # self.stats["chunks_created"] += len(chunks)
-            # For this verification, we skip heavy processing if dependencies are missing or just do a dry run
-            pass
+            logger.info("Computing file checksums for diff...")
+            for f in all_files:
+                try:
+                    rel_path = f.relative_to(repo_path).as_posix()
+                    current_hashes[rel_path] = self._compute_file_hash(f)
+                except Exception as e:
+                    logger.warning(f"Skipping hash for {f}: {e}")
+
+            # Get previous state
+            stored_hashes = self.storage_manager.get_file_checksums(repo_name)
+            
+            # Compare
+            new_files = []
+            modified_files = []
+            deleted_files = []
+            
+            # Detect New & Modified
+            for rel_path, current_hash in current_hashes.items():
+                if rel_path not in stored_hashes:
+                    new_files.append(rel_path)
+                else:
+                    # It exists in both.
+                    if self.config.force_full_scan:
+                        modified_files.append(rel_path)
+                    elif stored_hashes[rel_path] != current_hash:
+                        modified_files.append(rel_path)
+                    
+            # Detect Deleted
+            for rel_path in stored_hashes:
+                if rel_path not in current_hashes:
+                    deleted_files.append(rel_path)
+            
+            logger.info(f"Diff Analysis: {len(new_files)} new, {len(modified_files)} modified, {len(deleted_files)} deleted.")
+            
+            # Handle Deletions & Modifications (Cleanup old chunks)
+            files_to_cleanup = deleted_files + modified_files
+            if files_to_cleanup:
+                logger.info(f"Cleaning up {len(files_to_cleanup)} stale files from DB...")
+                # We need to cleanup by file_path. 
+                # Note: get_file_checksums returns relative paths if that's what we stored?
+                # Actually, in metadata_store.py we store "file_path" which might be absolute or relative depending on how it was stored.
+                # To be safe, we should assume the DB keys match what we derived earlier.
+                # However, our storage relies on 'file_path'.
+                # Let's ensure we pass the correct path format expected by delete_file_chunks.
+                # Ideally, delete_file_chunks expects the exact string stored in 'file_path' column.
+                
+                # IMPORTANT: If we stored absolute paths before, this might mismatch if we only used relative keys for diff.
+                # But storage_manager.get_file_checksums returns the stored file_paths as keys.
+                # So we can just use those keys.
+                for rel_path in files_to_cleanup:
+                    # In DB we might have stored normalized absolute paths or relative.
+                    # We will use what was returned by get_file_checksums (which are the DB keys).
+                    self.storage_manager.delete_file_chunks(rel_path)
+
+            # Filter Processing List
+            # We need to map relative paths back to absolute Path objects for processing
+            files_to_process_rel = set(new_files + modified_files)
+            files_to_process = [f for f in all_files if f.relative_to(repo_path).as_posix() in files_to_process_rel]
+            
+            if not files_to_process and not deleted_files:
+                logger.info("No changes detected. Skipping processing.")
+                self.stats["status"] = "COMPLETED"
+                return
+
+            logger.info(f"Processing {len(files_to_process)} files...")
+
+            # 3. Dependencies (Analyze ALL files to ensure graph is complete, or just processed?)
+            # Dependency graph usually needs the whole repo context. 
+            # If we skip files, we might miss imports FROM them or TO them.
+            # OPTIMIZATION CHOICE: We still run dependency analysis on ALL files to maintain graph integrity.
+            # This is fast compared to chunking/embedding.
+            dep_graph, imports = self._analyze_dependencies(all_files)
+            self.dependency_graph = dep_graph
+            self.imports_map = imports 
+            
+            # 4. Process (Chunk & Embed) - ONLY Changed Files
+            chunks = self.chunk_processor.process_batch(files_to_process, repo_root=repo_path)
+            self.stats["chunks_created"] += len(chunks)
             
             # 4. Quality
-            # self._analyze_quality(chunks_dir)
-            pass
+            self._analyze_quality(self.storage_manager.config.base_path / "chunks")
             
             # 5. Report
             session_id = f"run_{int(time.time())}"
-            self._generate_reports(session_id)
+            repo_name = repo_path.name if 'repo_path' in locals() else "unknown"
+            module_map = self.dependency_data.get('module_map', {}) if hasattr(self, 'dependency_data') and self.dependency_data else {}
+            self._generate_reports(session_id, self.dependency_graph, module_map=module_map, repo_name=repo_name)
             
             self.stats["status"] = "COMPLETED"
             
@@ -234,6 +339,27 @@ class MasterPipeline:
         finally:
             duration = datetime.now(timezone.utc) - self.start_time
             self.stats["duration_seconds"] = duration.total_seconds()
+            
+            # 5. Report - Moved to finally block to ensure it runs even on failure
+            if self.report_generator and self.stats["status"] != "COMPLETED":
+                session_id = f"run_{int(time.time())}"
+                # The imports_map from _analyze_dependencies serves as the module_map
+                module_map = self.dependency_data.get('module_map', {}) if hasattr(self, 'dependency_data') and self.dependency_data else {}
+                repo_name = repo_path.name if 'repo_path' in locals() else "unknown"
+                self._generate_reports(session_id, self.dependency_graph, module_map=module_map, repo_name=repo_name)
+            
+            # Explicit Summary Log for User
+            repo_name = repo_path.name if 'repo_path' in locals() else "Unknown"
+            total_time = self.stats.get("duration_seconds", 0)
+            
+            logger.info("="*50)
+            logger.info("BEYOND PIPELINE SUMMARY")
+            logger.info("="*50)
+            logger.info(f"Repository:    {repo_name}")
+            logger.info(f"Total Time:    {total_time:.2f}s")
+            logger.info(f"Files Scanned: {self.stats.get('files_scanned', 0)}")
+            logger.info(f"Chunks Created: {self.stats.get('chunks_created', 0)}")
+            logger.info("="*50)
 
     def close(self):
         """Close pipeline resources"""

@@ -1,7 +1,7 @@
 from typing import Dict, Any, Union
 from dataclasses import dataclass
 from pathlib import Path
-import logging
+from src.utils.logger import get_logger
 import pickle
 
 from src.core.chunk_model import Chunk
@@ -109,9 +109,7 @@ class QualityAnalyzer:
                     total_maintainability += metrics.get("maintainability", 0)
                     count += 1
             except Exception as e:
-                # logger might not be defined in this scope if I didn't import it in this file
-                # I should add logger import
-                pass
+                logger.warning(f"Failed to analyze chunk {chunk_file}: {e}")
                 
         results["total_chunks"] = count
         if count > 0:

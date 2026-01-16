@@ -11,12 +11,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import json
 import re
-import logging
+from src.utils.logger import get_logger
 from io import StringIO, BytesIO
 import xmlschema
 from collections import defaultdict
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class XMLNode:

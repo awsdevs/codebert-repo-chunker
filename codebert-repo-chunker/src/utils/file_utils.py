@@ -27,7 +27,7 @@ import gzip
 import bz2
 import lzma
 from contextlib import contextmanager
-import logging
+from src.utils.logger import get_logger
 import fnmatch
 import re
 import mmap
@@ -37,7 +37,7 @@ import threading
 from functools import lru_cache
 import pickle
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class FileType(Enum):
     """File type classifications"""

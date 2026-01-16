@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import List, Set, Iterator, Tuple, Optional, Union
 from dataclasses import dataclass, field
-import logging
+from src.utils.logger import get_logger
 import os
 
 try:
@@ -12,7 +12,7 @@ except ImportError:
 
 from src.classifiers.file_classifier import FileClassifier, FileClassification, FileCategory
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class ScannerConfig:

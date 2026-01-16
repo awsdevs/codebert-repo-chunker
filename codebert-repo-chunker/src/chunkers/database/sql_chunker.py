@@ -11,14 +11,14 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Set, Union
 from dataclasses import dataclass, field
 from collections import defaultdict, OrderedDict
-import logging
+from src.utils.logger import get_logger
 from enum import Enum
 
 from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from config.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class SQLStatementType(Enum):
     """Types of SQL statements"""

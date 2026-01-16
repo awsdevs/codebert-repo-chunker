@@ -1,21 +1,21 @@
 
-from typing import Dict, Any, List, Optional, Union, Generator
+from typing import Dict, Any, List, Optional, Union, Generator, Tuple
 from enum import Enum
 from pathlib import Path
 from dataclasses import dataclass
-import logging
+from src.utils.logger import get_logger
 import json
 import shutil
 
 import numpy as np
 
-from src.core.chunk_model import Chunk
+from src.core.chunk_model import Chunk, ChunkLocation, ChunkType
 from src.storage.chunk_storage import ChunkStorage, StorageConfig as ChunkStorageConfig
 from src.storage.metadata_store import MetadataStore, MetadataConfig
 
 from src.storage.vector_store import VectorStore, VectorConfig
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class DeploymentEnvironment(Enum):
     DEVELOPMENT = "development"
@@ -84,18 +84,75 @@ class StorageManager:
                 chunk.language
             )
             
-            # 2. Store Metadata
-            self.metadata_store.store(chunk.id, chunk.to_dict())
+            # 2. Store Metadata (Strip large fields handled by MetadataStore)
+            metadata_payload = chunk.to_dict()
+            # Content is needed for FTS in MetadataStore, so don't pop it here
+            metadata_payload.pop('embedding', None)
             
-            # 3. Store Vector (if embedding exists)
+            # Helper: Flatten essential location data for easier indexing
+            if 'location' in metadata_payload and isinstance(metadata_payload['location'], dict):
+                metadata_payload['file_path'] = metadata_payload['location'].get('file_path', '')
+                metadata_payload['start_line'] = metadata_payload['location'].get('start_line', 0)
+                metadata_payload['end_line'] = metadata_payload['location'].get('end_line', 0)
+                
+            self.metadata_store.store(chunk.id, metadata_payload)
+            
             if self.vector_store and chunk.embedding is not None and np:
                  if isinstance(chunk.embedding, np.ndarray):
                     self.vector_store.add([chunk.id], chunk.embedding.reshape(1, -1))
             
+            # Progress log (optional, maybe too noisy if called frequently, but good for debug)
+            # logger.debug(f"Successfully stored chunk {chunk.id}")
             return True
         except Exception as e:
             logger.error(f"Failed to store chunk {chunk.id}: {e}")
             return False
+
+    def store_chunks_batch(self, chunks: List[Chunk]) -> int:
+        """
+        Store a batch of chunks across all backends.
+        Returns the number of chunks successfully stored.
+        """
+        if not chunks:
+            return 0
+            
+        try:
+            # Prepare batches
+            chunk_data = []
+            metadata_list = []
+            vector_ids = []
+            vector_embeddings = []
+            
+            for chunk in chunks:
+                chunk_data.append((chunk.id, chunk.content, chunk.location.file_path, chunk.language))
+                
+                # Inject content into metadata for FTS
+                # Make a shallow copy to avoid mutating the original chunk.metadata persistently if unwanted
+                meta = chunk.metadata.copy() if chunk.metadata else {}
+                meta['content'] = chunk.content
+                metadata_list.append((chunk.id, meta))
+                
+                if chunk.embedding is not None and isinstance(chunk.embedding, np.ndarray):
+                    vector_ids.append(chunk.id)
+                    vector_embeddings.append(chunk.embedding)
+
+            # Store in parallel/sequence
+            # 1. Chunk Storage
+            c_count = self.chunk_storage.store_batch(chunk_data)
+            
+            # 2. Metadata Store
+            m_count = self.metadata_store.store_batch(metadata_list)
+            
+            # 3. Vector Store
+            if self.vector_store and vector_ids:
+                embeddings_np = np.vstack(vector_embeddings)
+                self.vector_store.add(vector_ids, embeddings_np)
+                
+            logger.info(f"Batch stored {len(chunks)} chunks (Chunks: {c_count}, Meta: {m_count})")
+            return len(chunks)
+        except Exception as e:
+            logger.error(f"Failed to store chunks batch: {e}")
+            return 0
             
     def get_chunk(self, chunk_id: str) -> Optional[Chunk]:
         """Retrieve a complete chunk"""
@@ -143,13 +200,42 @@ class StorageManager:
             hydrated_results.append({
                 'id': chunk_id,
                 'score': float(score),
-                'file_path': metadata.get('file_path'),
+                'file_path': metadata.get('file_path') or metadata.get('location', {}).get('file_path'),
                 'function_name': metadata.get('function_name'),
                 'snippet': snippet,
                 'metadata': metadata
             })
             
         return hydrated_results
+
+    def search_text(self, query: str, limit: int = 20) -> List[Tuple[str, float]]:
+        """Full text search returning (chunk_id, rank)"""
+        return self.metadata_store.search_text(query, limit)
+
+    def delete_file_chunks(self, file_path: str) -> int:
+        """
+        Delete all chunks for a file across all backends
+        Returns number of chunks deleted (from chunk storage perspective)
+        """
+        # 1. Get chunk IDs first (needed for vector deletion)
+        chunk_ids = self.metadata_store.list_by_file(file_path)
+        
+        # 2. Delete from vector store
+        if self.vector_store and chunk_ids:
+            self.vector_store.remove(chunk_ids)
+        
+        # 3. Delete from metadata
+        self.metadata_store.delete_by_file(file_path)
+        
+        # 4. Delete from chunk storage
+        count = self.chunk_storage.delete_by_file(file_path)
+        
+        logger.info(f"Deleted {count} chunks for {file_path}")
+        return count
+        
+    def get_file_checksums(self, repository: str) -> Dict[str, str]:
+        """Get checksums for all files in a repo for diff updates"""
+        return self.metadata_store.get_file_checksums(repository)
 
     def save(self):
         """Save all storage backends"""
@@ -166,5 +252,10 @@ class StorageManager:
             
     def close(self):
         """Close connections"""
-        self.metadata_store.close()
         self.save()
+        
+        if hasattr(self.metadata_store, 'close'):
+            self.metadata_store.close()
+            
+        if hasattr(self.chunk_storage, 'close'):
+            self.chunk_storage.close()

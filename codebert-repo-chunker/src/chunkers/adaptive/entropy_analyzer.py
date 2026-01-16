@@ -8,7 +8,7 @@ import numpy as np
 from typing import List, Dict, Any, Optional, Tuple, Union
 from collections import Counter, deque
 from dataclasses import dataclass, field
-import logging
+from src.utils.logger import get_logger
 from scipy import signal
 from scipy.stats import entropy as scipy_entropy
 import warnings
@@ -16,7 +16,7 @@ import warnings
 # Suppress scipy warnings in production
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class EntropyMetrics:

@@ -1,5 +1,5 @@
 
-import logging
+from src.utils.logger import get_logger
 import time
 import shutil
 from pathlib import Path
@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 import yaml
 import numpy as np
+import hashlib
 
 from src.core.chunk_model import Chunk, ChunkType, ChunkLocation
 from src.storage.storage_manager import StorageManager
@@ -16,7 +17,7 @@ from src.classifiers.file_classifier import FileClassifier
 from src.chunkers.registry import get_registry
 from src.embeddings.codebert_encoder import CodeBERTEncoder, EncoderConfig
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class ProcessingConfig:
@@ -71,12 +72,12 @@ class ChunkProcessor:
         self.registry = get_registry(self.tokenizer)
         logger.info("Chunker Registry initialized")
 
-    def process_batch(self, file_paths: List[Path]) -> List[Chunk]:
+    def process_batch(self, file_paths: List[Path], repo_root: Optional[Path] = None) -> List[Chunk]:
         """Process a batch of files"""
         chunks = []
         for file_path in file_paths:
             try:
-                file_chunks = self.process_file(file_path)
+                file_chunks = self.process_file(file_path, repo_root)
                 chunks.extend(file_chunks)
             except Exception as e:
                 logger.error(f"Failed to process {file_path}: {e}")
@@ -89,11 +90,16 @@ class ChunkProcessor:
         
         if self.encoder and chunks:
              # Extract chunks that need embedding (if any weren't done in process_file)
-             pass 
-
+            pass 
+            
         return chunks
 
-    def process_file(self, file_path: Union[Path, str]) -> List[Chunk]:
+    def close(self):
+        """Close resources"""
+        if self.storage_manager:
+            self.storage_manager.close()
+
+    def process_file(self, file_path: Union[Path, str], repo_root: Optional[Path] = None) -> List[Chunk]:
         """Process a single file: Classify -> Chunk -> Embed -> Store"""
         file_path = Path(file_path)
         if not file_path.exists():
@@ -101,10 +107,13 @@ class ChunkProcessor:
             
         self.stats.total_files += 1
         
-        # 1. Classify
+        # 1. Classify & Checksum
         # We read content once to pass to classifier and chunker
         try:
             content = file_path.read_text(errors='ignore')
+            # Compute checksum on bytes (robustness)
+            # Efficient enough for expected file sizes
+            sha256 = hashlib.sha256(file_path.read_bytes()).hexdigest()
         except Exception as e:
             logger.warning(f"Could not read {file_path}: {e}")
             return []
@@ -117,6 +126,38 @@ class ChunkProcessor:
         try:
             print(f"DEBUG: Chunking {file_path}")
             chunks = self.registry.chunk_file(file_path, content=content)
+            
+            # Relativize path if needed (crucial for diff logic consistency)
+            stored_path = str(file_path)
+            if repo_root:
+                try:
+                    stored_path = file_path.relative_to(repo_root).as_posix()
+                    # Apply to chunks locations too
+                    for chunk in chunks:
+                        chunk.location.file_path = stored_path
+                except ValueError:
+                    # Fallback if not subpath
+                    pass
+
+            # Enrich with dependencies if possible
+            if file_path.suffix == '.py':
+                try:
+                    # Simple regex extraction for now to verify storage
+                    import re
+                    imports = []
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if line.startswith('import ') or line.startswith('from '):
+                            imports.append(line)
+                    
+                    if imports:
+                        print(f"DEBUG: Found {len(imports)} imports for {file_path}")
+                        for chunk in chunks:
+                            chunk.dependencies = list(set(imports)) # De-duplicate
+                            
+                except Exception as e:
+                    logger.warning(f"Dependency extraction failed for {file_path}: {e}")
+                
         except Exception as e:
             logger.error(f"Chunking failed for {file_path}: {e}")
             return []
@@ -143,17 +184,23 @@ class ChunkProcessor:
         # 4. Store
         if self.storage_manager:
             for chunk in chunks:
-                # Enrich chunk metadata from classification
-                if chunk.metadata and hasattr(chunk.metadata, 'annotations'):
-                    chunk.metadata.annotations['language'] = str(classification.technology_stack)
-                    chunk.metadata.annotations['domain'] = classification.domain.value
-                    chunk.metadata.annotations['purpose'] = classification.purpose.value
-                elif isinstance(chunk.metadata, dict):
-                    chunk.metadata['language'] = str(classification.technology_stack)
-                    chunk.metadata['domain'] = classification.domain.value
-                    chunk.metadata['purpose'] = classification.purpose.value
+                # Ensure metadata dict exists
+                if not chunk.metadata: chunk.metadata = {}
                 
-                self.storage_manager.store_chunk(chunk)
-                self.stats.total_chunks += 1
+                # Use flexible dict access
+                meta = chunk.metadata if isinstance(chunk.metadata, dict) else chunk.metadata.__dict__
+                
+                # Add Classification
+                meta['language'] = str(classification.technology_stack)
+                meta['domain'] = classification.domain.value
+                meta['purpose'] = classification.purpose.value
+                
+                # Add System Fields (Essential for Diff)
+                meta['file_checksum'] = sha256
+                meta['file_path'] = stored_path # Ensure consistent path in metadata
+                meta['repository'] = repo_root.name if repo_root else 'unknown' # Basic repo tracking
+                
+            count = self.storage_manager.store_chunks_batch(chunks)
+            self.stats.total_chunks += count
                 
         return chunks

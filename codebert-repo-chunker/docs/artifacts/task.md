@@ -1,0 +1,83 @@
+- [x] Explore codebase to locate storage implementations <!-- id: 0 -->
+- [x] Analyze storage implementations <!-- id: 1 -->
+- [x] Provide review feedback <!-- id: 2 -->
+- [x] Explore pipeline files <!-- id: 3 -->
+- [x] Analyze pipeline logic <!-- id: 4 -->
+- [x] Provide pipeline review feedback <!-- id: 5 -->
+- [x] List all source directories <!-- id: 6 -->
+- [x] Analyze core modules <!-- id: 7 -->
+- [x] Analyze classifier modules <!-- id: 8 -->
+- [x] Analyze chunker modules <!-- id: 9 -->
+- [x] Analyze utility modules <!-- id: 10 -->
+- [x] Synthesize usecase and summaries <!-- id: 11 -->
+- [x] Design missing modules (Scanner, Resolver, etc.) <!-- id: 12 -->
+- [x] Detail Dependency Resolver Architecture <!-- id: 13 -->
+- [x] Implement RepositoryScanner <!-- id: 14 -->
+- [x] Implement DependencyResolver (Registry + Parsers) <!-- id: 15 -->
+- [x] Implement QualityAnalyzer <!-- id: 16 -->
+- [x] Implement ReportGenerator <!-- id: 17 -->
+- [x] Fix `AttributeError: 'max_tokens'`
+    - [x] Update `BaseChunker`
+    - [x] Update all Chunker subclasses
+- [x] Fix Syntax Errors
+    - [x] `JavaScriptChunker` (`async`/`generator`)
+    - [x] `MavenChunker` (f-string)
+- [x] Fix Metadata Errors
+    - [x] `PythonChunker`
+    - [x] `GenericCodeChunker`
+    - [x] `AdaptiveChunker`
+- [x] Registry Fixes
+    - [x] Debug why `demo_search.py` returns 0 matches (Fixed: Ensure `pipeline.close()` flushes index)
+- [x] Investigate and fix redundancy of `content` and `embedding` in `metadata.db`
+    - [x] Verify `reproduce_issue.py` (Confirmed clean)
+    - [x] Verify DB size reduction
+- [x] Dependency Updates
+    - [x] Add `xmlschema`, `python-hcl2`
+    - [x] Verify Master Pipeline
+    - [x] Run end-to-end
+    - [x] Fix "0 chunks created" issue (Debug ChunkProcessor/Chunker logic)
+- [x] Improve dependency report graph (make it less "messy")
+- [x] Standardize logger usage (ensure src.utils.logger is used)
+- [x] Address gradle_chunker.py (implement or remove)
+- [x] Resolve duplicate logging configuration
+    - [x] Verify reports generated run <!-- id: 19 -->
+    - [x] Improve Dependency Graph Accuracy (Linked internal imports to source files)
+- [x] Implement Query & Retrieval
+    - [x] Create simple query script (demo_search.py) <!-- id: 22 -->
+    - [x] Enhance StorageManager.search_by_vector (Issue #2 fix) <!-- id: 25 -->
+    - [x] Verify data persistence and schema consistency (Issue #3 & #4 fix) <!-- id: 26 -->Summary Logger (Explicitly list repo stats via logger)
+    - [x] Fix `Chunk` model mismatch (`BaseChunker` vs `ChunkModel`)
+    - [x] Fix `ChunkMetadata` assignment bug
+    - [x] Verify `demo_search.py`
+- [x] **Refactor Storage Layer** (Phase 1 & 2)
+    - [x] Fix `VectorStore` to support updates (IndexIDMap, remove method)
+    - [x] Fix `MetadataStore` missing schema & methods (list_by_file, delete)
+    - [x] Fix `StorageManager` missing methods (delete_file_chunks, sync primitives)
+    - [x] Implement robust logging for storage operations
+    - [x] Add path normalization for cross-platform support
+- [x] **Optimize Performance** (Phase 3)
+    - [x] Implement batch inserts for SQLite (ChunkStorage, MetadataStore)
+    - [x] Update ChunkProcessor to use batch storage
+    - [x] Verify with `test_batch_ops.py`
+    - [x] Verify with `test_batch_ops.py`
+    - [ ] Tune FAISS parameters if needed
+- [x] **Implement Diff-Based Pipeline Logic** (Phase 2 Integration)
+    - [x] Update `MasterPipeline` to utilize `delete_file_chunks` and `get_file_checksums`
+    - [x] Implement `sync_repository` logic (Orchestrated in run method)
+    - [x] **Verification**: `tests/test_diff_integration.py` passed
+- [x] **Robustness & Data Integrity** (Phase 4)
+    - [x] **VectorStore**: Implement O(1) removal (reverse_map) and fix IVF removal
+    - [x] **MetadataStore**: Add indexes for `file_path`, `repository`
+    - [x] **MasterPipeline**: Fix double report generation
+    - [x] Enhance FTS rich text builder (Refinement)
+- [x] **External Configuration Management** (User Request)
+    - [x] Create `config.json` with descriptions (Rationale field)
+    - [x] Implement `ConfigLoader` to hydrate `PipelineConfig`
+    - [x] Update `MasterPipeline` to load from config file
+    - [x] **Configurable Load Strategy**: Added `force_full_scan` option (User Request)
+- [x] **Robustness Fixes** (User Feedback)
+    - [x] **VectorStore**: Fix IVF training via `IndexIDMap` wrapper
+    - [x] **MetadataStore**: Fix duplicate FTS entries in `store_batch`
+    - [x] **QualityAnalyzer**: Remove silent exception swallowing
+    - [x] **Demo Search**: Implement specific pattern search test
+

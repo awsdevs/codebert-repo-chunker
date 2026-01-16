@@ -1,7 +1,7 @@
 
 import re
 import string
-import logging
+from src.utils.logger import get_logger
 import math
 from typing import List, Dict, Any, Optional, Tuple, Set
 from dataclasses import dataclass, field
@@ -17,7 +17,7 @@ try:
 except ImportError:
     NLTK_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class TextStatistics:

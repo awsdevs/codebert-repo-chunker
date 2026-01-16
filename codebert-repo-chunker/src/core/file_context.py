@@ -16,14 +16,14 @@ from typing import Dict, List, Optional, Tuple, Set, Any, Union
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from collections import defaultdict
-import logging
+from src.utils.logger import get_logger
 import chardet
 import git
 import ast
 import tokenize
 import io
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class FileType(Enum):
     """File type classifications"""

@@ -7,9 +7,9 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Any, Set
 from collections import defaultdict
 import community  # python-louvain
-import logging
+from src.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class GraphAnalyzer:
     """Analyze graph structures and relationships"""
