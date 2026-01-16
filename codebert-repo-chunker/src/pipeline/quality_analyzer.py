@@ -1,4 +1,4 @@
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, List
 from dataclasses import dataclass
 from pathlib import Path
 from src.utils.logger import get_logger
@@ -72,12 +72,12 @@ class QualityAnalyzer:
                 
         return comment_lines / len(lines)
 
-    def analyze_directory(self, chunks_dir: Path) -> Dict[str, Any]:
+    def analyze_chunks(self, chunks: List[Chunk]) -> Dict[str, Any]:
         """
-        Analyze quality for all chunks in a directory (pickled).
+        Analyze quality for a list of Chunk objects.
         
         Args:
-            chunks_dir: Directory containing pickled Chunk objects
+            chunks: List of Chunk objects
             
         Returns:
             Dictionary with quality scores and detailed metrics
@@ -88,28 +88,22 @@ class QualityAnalyzer:
             "total_chunks": 0
         }
         
-        if not chunks_dir.exists():
+        if not chunks:
             return results
             
         total_maintainability = 0.0
         count = 0
         
-        # Walk through chunks directory
-        for chunk_file in chunks_dir.glob("**/*.pkl"):
+        for chunk in chunks:
             try:
-                with open(chunk_file, "rb") as f:
-                    chunk = pickle.load(f)
-                    
-                if hasattr(chunk, 'content'): # Duck typing check for Chunk
-                    metrics = self.analyze_chunk(chunk)
-                    # Use chunk.id or file name as key
-                    chunk_id = getattr(chunk, 'id', chunk_file.stem)
-                    results["file_metrics"][chunk_id] = metrics
-                    
-                    total_maintainability += metrics.get("maintainability", 0)
-                    count += 1
+                metrics = self.analyze_chunk(chunk)
+                # Use chunk.id as key
+                results["file_metrics"][chunk.id] = metrics
+                
+                total_maintainability += metrics.get("maintainability", 0)
+                count += 1
             except Exception as e:
-                logger.warning(f"Failed to analyze chunk {chunk_file}: {e}")
+                logger.warning(f"Failed to analyze chunk {chunk.id}: {e}")
                 
         results["total_chunks"] = count
         if count > 0:
@@ -118,3 +112,22 @@ class QualityAnalyzer:
             results["overall_score"] = min(1.0, max(0.0, avg_maintainability / 100.0))
             
         return results
+
+    def analyze_directory(self, chunks_dir: Path) -> Dict[str, Any]:
+        """
+        Analyze quality for all chunks in a directory (Legacy/Pickle support).
+        
+        Args:
+            chunks_dir: Directory containing pickled Chunk objects
+        """
+        chunks = []
+        if chunks_dir.exists():
+            for chunk_file in chunks_dir.glob("**/*.pkl"):
+                try:
+                    with open(chunk_file, "rb") as f:
+                        chunk = pickle.load(f)
+                    if hasattr(chunk, 'content'):
+                        chunks.append(chunk)
+                except Exception:
+                    pass
+        return self.analyze_chunks(chunks)

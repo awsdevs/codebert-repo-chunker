@@ -38,31 +38,23 @@ class PythonParser(BaseManifestParser):
         """Parse imports from python source files"""
         deps = []
         try:
-            # We can use AST for robustness, or regex for speed/tolerance
-            # Using simple regex to match what we did in ChunkProcessor
-            import re
-            for i, line in enumerate(content.splitlines()):
-                line = line.strip()
-                match = None
-                
-                # import x.y
-                if line.startswith('import '):
-                    match = re.match(r'^import\s+([\w\.]+)', line)
-                # from x.y import z
-                elif line.startswith('from '):
-                    match = re.match(r'^from\s+([\w\.]+)', line)
-                    
-                if match:
-                    module_name = match.group(1)
-                    deps.append(Dependency(
-                        name=module_name,
-                        version='*',
-                        type='import',
-                        source_file=filename,
-                        line_number=i+1
-                    ))
-        except Exception:
-            pass
+            from src.utils.import_extractor import ImportExtractor
+            from src.utils.logger import get_logger
+            logger = get_logger(__name__)
+            
+            imports = ImportExtractor.extract_imports(content, 'python')
+            
+            for i, module_name in enumerate(imports):
+                deps.append(Dependency(
+                    name=module_name,
+                    version='*',
+                    type='import',
+                    source_file=filename,
+                    line_number=0 # ImportExtractor doesn't return line numbers yet
+                ))
+        except Exception as e:
+            logger.warning(f"Failed to parse python source {filename}: {e}")
+            
         return deps
 
     def _parse_requirements(self, content: str, filename: str) -> List[Dependency]:

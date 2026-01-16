@@ -4,7 +4,7 @@ Uses multiple techniques including patterns, entropy, statistical analysis, and 
 """
 
 import re
-import magic
+import puremagic
 import chardet
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any, Set
@@ -340,12 +340,6 @@ class ContentAnalyzer:
     
     def __init__(self):
         """Initialize content analyzer"""
-        self.magic = None
-        try:
-            self.magic = magic.Magic(mime=True)
-        except:
-            logger.warning("python-magic not available, MIME detection limited")
-        
         # Initialize TF-IDF vectorizer for keyword extraction
         self.tfidf = TfidfVectorizer(
             max_features=20,
@@ -887,10 +881,13 @@ class ContentAnalyzer:
                 mime_type = guessed
         
         # Try magic if available
-        if self.magic and not mime_type:
+        if not mime_type:
             try:
-                mime_type = self.magic.from_buffer(content.encode('utf-8', errors='ignore'))
-            except:
+                # puremagic.from_string returns list of MagicInfo, getting mime from first
+                detected = puremagic.from_string(content.encode('utf-8', errors='ignore'), mime=True)
+                if detected:
+                     mime_type = detected
+            except Exception as e:
                 pass
         
         return mime_type

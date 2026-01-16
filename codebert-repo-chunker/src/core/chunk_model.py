@@ -50,6 +50,29 @@ class ChunkType(str, Enum):
     OTHER = "other"
     UNKNOWN = "unknown"
 
+class RelationType(str, Enum):
+    """Types of relationships between chunks"""
+    IMPORTS = "imports"
+    CALLS = "calls"
+    INHERITS = "inherits"
+    SIMILAR_TO = "similar_to"
+    RELATED_TO = "related_to"
+    DEPENDS_ON = "depends_on"
+    DEFINES = "defines"
+    IMPLEMENTS = "implements"
+
+@dataclass
+class ChunkRelation:
+    """Relationship between two chunks"""
+    source_id: str
+    target_id: str
+    relation_type: str # e.g. "imports", "calls", "inherits", "similar_to", "related_to"
+    strength: float = 1.0
+    confidence: float = 1.0
+    bidirectional: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    evidence: List[str] = field(default_factory=list)
+
 @dataclass
 class Chunk:
     """Represents a discrete unit of code for embedding"""
