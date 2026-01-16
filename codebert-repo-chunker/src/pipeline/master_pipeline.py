@@ -11,7 +11,9 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import json
 import asyncio
 import hashlib
+import pickle
 from datetime import datetime, timezone
+
 from pathlib import Path
 
 # Integration components
