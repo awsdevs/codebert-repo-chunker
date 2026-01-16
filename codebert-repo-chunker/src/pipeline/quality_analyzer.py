@@ -7,6 +7,10 @@ import pickle
 from src.core.chunk_model import Chunk
 from src.utils.text_utils import TextAnalyzer, TextStatistics
 
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 @dataclass
 class QualityMetrics:
     complexity: float

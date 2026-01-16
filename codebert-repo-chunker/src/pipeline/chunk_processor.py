@@ -12,6 +12,7 @@ import numpy as np
 import hashlib
 
 from src.core.chunk_model import Chunk, ChunkType, ChunkLocation
+from src.utils.import_extractor import ImportExtractor
 from src.storage.storage_manager import StorageManager
 from src.classifiers.file_classifier import FileClassifier
 from src.chunkers.registry import get_registry
@@ -138,23 +139,18 @@ class ChunkProcessor:
                     pass
 
             # Enrich with dependencies if possible
-            if file_path.suffix == '.py':
-                try:
-                    # Simple regex extraction for now to verify storage
-                    import re
-                    imports = []
-                    for line in content.splitlines():
-                        line = line.strip()
-                        if line.startswith('import ') or line.startswith('from '):
-                            imports.append(line)
-                    
-                    if imports:
-                        print(f"DEBUG: Found {len(imports)} imports for {file_path}")
-                        for chunk in chunks:
-                            chunk.dependencies = list(set(imports)) # De-duplicate
-                            
-                except Exception as e:
-                    logger.warning(f"Dependency extraction failed for {file_path}: {e}")
+                # Enrich with dependencies if possible
+                if file_path.suffix in ImportExtractor.SUPPORTED_LANGUAGES.union({'.web'}): # .web isn't a language but let ImportExtractor handle suffix check
+                     try:
+                        # Extract imports using unified extractor
+                        imports = ImportExtractor.extract_imports(content, file_path)
+                        
+                        if imports:
+                            for chunk in chunks:
+                                chunk.dependencies = list(set(imports)) # De-duplicate
+                                
+                     except Exception as e:
+                        logger.warning(f"Dependency extraction failed for {file_path}: {e}")
                 
         except Exception as e:
             logger.error(f"Chunking failed for {file_path}: {e}")

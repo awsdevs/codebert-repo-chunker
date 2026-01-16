@@ -160,6 +160,11 @@ class RelationshipBuilder:
         
         # Thread pool for parallel processing
         self.executor = ThreadPoolExecutor(max_workers=self.config.max_workers)
+
+    def close(self):
+        """Shutdown resources"""
+        if self.executor:
+            self.executor.shutdown(wait=True)
     
     def build_relationships(self, 
                           chunks: List[Chunk],
@@ -381,7 +386,8 @@ class RelationshipBuilder:
                             calls.append(node.func.id)
                         elif isinstance(node.func, ast.Attribute):
                             calls.append(node.func.attr)
-            except:
+            except Exception as e:
+                logger.warning(f"AST parsing failed for call extraction: {e}")
                 # Fallback to regex
                 call_pattern = re.compile(r'(\w+)\s*\(')
                 for match in call_pattern.finditer(chunk.content):
@@ -1004,7 +1010,8 @@ class RelationshipBuilder:
         try:
             page_rank = nx.pagerank(self.graph, max_iter=100)
             return page_rank.get(chunk_id, 0.0)
-        except:
+        except Exception as e:
+            logger.warning(f"PageRank failed: {e}")
             # Fallback to degree centrality
             degree = self.graph.degree(chunk_id)
             max_degree = max(dict(self.graph.degree()).values()) if self.graph.number_of_nodes() > 0 else 1

@@ -354,12 +354,6 @@ class MasterPipeline:
             # 6. Quality
             self._analyze_quality(chunks)
             
-            # 5. Report
-            session_id = f"run_{int(time.time())}"
-            repo_name = repo_path.name if 'repo_path' in locals() else "unknown"
-            module_map = self.dependency_data.get('module_map', {}) if hasattr(self, 'dependency_data') and self.dependency_data else {}
-            self._generate_reports(session_id, self.dependency_graph, module_map=module_map, repo_name=repo_name)
-            
             self.stats["status"] = "COMPLETED"
             
         except Exception as e:
@@ -371,15 +365,14 @@ class MasterPipeline:
             self.stats["duration_seconds"] = duration.total_seconds()
             
             # 5. Report - Moved to finally block to ensure it runs even on failure
-            if self.report_generator and self.stats["status"] != "COMPLETED":
+            # We removed the duplicate call in try block, so this must run for SUCCESS too.
+            if self.report_generator:
                 session_id = f"run_{int(time.time())}"
                 # The imports_map from _analyze_dependencies serves as the module_map
                 module_map = self.dependency_data.get('module_map', {}) if hasattr(self, 'dependency_data') and self.dependency_data else {}
-                repo_name = repo_path.name if 'repo_path' in locals() else "unknown"
                 self._generate_reports(session_id, self.dependency_graph, module_map=module_map, repo_name=repo_name)
             
             # Explicit Summary Log for User
-            repo_name = repo_path.name if 'repo_path' in locals() else "Unknown"
             total_time = self.stats.get("duration_seconds", 0)
             
             logger.info("="*50)
