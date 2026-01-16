@@ -77,7 +77,7 @@ class SensitiveDataFilter(logging.Filter):
                     # Redact the value after the sensitive key
                     import re
                     record.msg = re.sub(
-                        f'{pattern}["\']?:\s*["\']?[^"\',\s}}]+',
+                        rf'{pattern}["\']?:\s*["\']?[^"\',\s}}]+',
                         f'{pattern}: ***REDACTED***',
                         str(record.msg),
                         flags=re.IGNORECASE
