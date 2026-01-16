@@ -49,11 +49,18 @@ class MetadataStore:
         self.conn.execute(fts_sql)
         logger.info(f"Initialized FTS Schema: {fts_sql.strip()}")
         
+        # Performance Indexes
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_meta_filepath ON metadata(file_path)")
+        self.conn.execute("CREATE INDEX IF NOT EXISTS idx_meta_repository ON metadata(repository)")
+        
         self.conn.commit()
 
     def store(self, chunk_id: str, metadata: Dict[str, Any]):
         """Store metadata for a chunk"""
         try:
+            # Prepare FTS text before removing content
+            rich_text = self._build_rich_text(metadata)
+            
             # Enforce removal of heavy fields to prevent redundancy
             # This catches cases where callers bypass StorageManager
             if isinstance(metadata, dict):
@@ -78,13 +85,68 @@ class MetadataStore:
                 # Delete existing to prevent duplicates in FTS
                 self.conn.execute("DELETE FROM search_index WHERE chunk_id = ?", (chunk_id,))
                 
-                rich_text = f"{file_path} {repo} {metadata.get('docstring', '')} {metadata.get('function_name', '')}"
                 self.conn.execute("INSERT INTO search_index (chunk_id, rich_text) VALUES (?, ?)", 
                                 (chunk_id, rich_text))
             
             logger.debug(f"Stored metadata for {chunk_id}")
         except Exception as e:
             logger.error(f"Metadata store error {chunk_id}: {e}")
+
+    def store_batch(self, metadata_list: List[Tuple[str, Dict[str, Any]]]) -> int:
+        """Batch store metadata."""
+        if not metadata_list: return 0
+        try:
+            meta_batch, fts_batch, fts_delete = [], [], []
+            for chunk_id, meta in metadata_list:
+                # Prepare FTS text using original meta (including content)
+                rich_text = self._build_rich_text(meta)
+                
+                # Track for deletion to prevent duplicates
+                fts_delete.append((chunk_id,))
+                
+                # Cleaner copy for metadata storage (remove heavy blobs)
+                m = meta.copy() if isinstance(meta, dict) else meta
+                if isinstance(m, dict):
+                    m.pop('content', None); m.pop('embedding', None)
+                
+                path = m.get('file_path', '')
+                repo = m.get('repository', '')
+                json_str = json.dumps(m, default=str)
+                
+                meta_batch.append((chunk_id, path, repo, json_str))
+                fts_batch.append((chunk_id, rich_text))
+            
+            with self.conn:
+                self.conn.executemany("""
+                    INSERT OR REPLACE INTO metadata (chunk_id, file_path, repository, json_data, updated_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, meta_batch)
+                
+                # Delete existing FTS entries before inserting (prevents duplicates)
+                self.conn.executemany("DELETE FROM search_index WHERE chunk_id = ?", fts_delete)
+                self.conn.executemany("INSERT INTO search_index(chunk_id, rich_text) VALUES (?, ?)", fts_batch)
+            return len(meta_batch)
+        except Exception as e:
+            logger.error(f"Batch meta store error: {e}")
+            return 0
+
+    def _build_rich_text(self, metadata: Dict[str, Any]) -> str:
+        """Build comprehensive searchable text"""
+        nested = metadata.get('metadata', {})
+        # Prioritize key fields
+        parts = [
+            metadata.get('file_path', ''),
+            metadata.get('repository', ''),
+            metadata.get('language', ''),
+            metadata.get('chunk_type', ''),
+            nested.get('class_name', ''),
+            str(nested.get('function_name', '') or metadata.get('function_name', '')),
+            str(nested.get('docstring', '') or metadata.get('docstring', '')),
+            nested.get('package_name', ''),
+            # Content is crucial for code search
+            metadata.get('content', '') 
+        ]
+        return ' '.join(filter(None, [str(p) for p in parts]))
 
     def get(self, chunk_id: str) -> Optional[Dict[str, Any]]:
         cursor = self.conn.execute("SELECT json_data FROM metadata WHERE chunk_id = ?", (chunk_id,))
