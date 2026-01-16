@@ -59,3 +59,27 @@ Implement "smart updates" in the `MasterPipeline` to avoid re-processing files t
 
 ### [MODIFY] [demo_search.py](file:///Users/sai/saiData/codebert_google/codebert_google/codebert-repo-chunker/demo_search.py)
 - **Refinement**: Replace generic `Logger` search with a project-specific pattern search (e.g., `ConfigLoader.load_config` usage) to demonstrate structural/pattern search capabilities.
+
+## Code Review Fixes (Phase 5)
+
+### Critical Patches
+1. **RelationshipBuilder Integration**
+    - [x] **Problem**: `MasterPipeline` ignores relationship building logic.
+    - [x] **Fix**: Call `RelationshipBuilder.build_relationships(chunks)` after `ChunkProcessor.process_batch`.
+2. **Dependency Consolidation**
+    - [x] **Problem**: Three different regex/AST implementations for import extraction.
+    - [x] **Fix**: Create `src/utils/import_extractor.py` (Unified AST-based extractor). Refactor `PythonParser`, `RelationshipBuilder`, and `ChunkProcessor` to use it.
+
+### High Priority Fixes
+3. **Similarity Optimization**
+    - [x] **Problem**: O(n²) loop in `RelationshipBuilder`.
+    - [x] **Fix**: Since we have FAISS, use `StorageManager.vector_store` to find nearest neighbors for each chunk, instead of brute-force all-pairs comparison.
+4. **Parser Robustness**
+    - [x] **Problem**: `except: pass` in parsers hides errors.
+    - [x] **Fix**: Add proper error logging in `python_parser.py`, `java_parser.py`, etc.
+5. **Quality Analysis Path**
+    - [x] **Problem**: `QualityAnalyzer` looks for non-existent pickle files.
+    - [x] **Fix**: Update `analyze` to accept list of `Chunk` objects from memory or query DB.
+6. **Metadata Consistency**
+    - [x] **Problem**: `RelationshipBuilder` accesses missing attributes.
+    - [x] **Fix**: Use `getattr(chunk.metadata, ...)` with defaults.
