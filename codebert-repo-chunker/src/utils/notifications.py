@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from enum import Enum
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import logging
+from src.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class NotificationLevel(Enum):
     """Notification severity levels"""

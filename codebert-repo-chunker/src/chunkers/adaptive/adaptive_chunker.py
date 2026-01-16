@@ -10,14 +10,14 @@ from typing import List, Dict, Any, Optional, Tuple, Set
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-import logging
+from src.utils.logger import get_logger
 
 from src.core.base_chunker import BaseChunker, Chunk, ChunkerConfig
 from src.core.file_context import FileContext
 from src.utils.text_utils import TextAnalyzer
 from config.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class ContentPattern:

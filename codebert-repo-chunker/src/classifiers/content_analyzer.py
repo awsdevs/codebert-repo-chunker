@@ -19,7 +19,7 @@ import json
 import yaml
 import xml.etree.ElementTree as ET
 from datetime import datetime
-import logging
+from src.utils.logger import get_logger
 
 import numpy as np
 from scipy import stats
@@ -29,7 +29,7 @@ import nltk
 from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Download required NLTK data
 try:

@@ -65,3 +65,70 @@ utils/
 impost JSON
 
 
+1. src/storage/chunk_storage.py
+
+Objective: Transform this file from a generic, multi-backend placeholder into a dedicated, high-performance content store for code blobs.
+
+Removed:
+
+Redundant Columns: Removed file_path, language, project, and repository columns from the chunks table. These attributes describe the context of the code, not the content itself, and are now strictly managed in the metadata_store. This normalization prevents data inconsistency (e.g., updating a file path in one place but forgetting the other).
+Unused Imports: Removed imports for lmdb, h5py, and shutil. The architecture now standardizes on SQLite for content, removing the need for these alternative file-system backends.
+Complex Versioning Logic: Removed the chunk_versions table logic. In the Beta phase, maintaining complex version histories for chunks adds significant overhead. We effectively flattened the storage to "current state," with the plan to re-introduce versioning via Git commit hashes in metadata rather than database-level versioning.
+Implemented:
+
+Content Compression (zlib): Added automatic zlib compression on store() and decompression on retrieve(). For 140 repositories, code text is highly compressible (60-80% reduction), saving gigabytes of disk space.
+WAL Mode Enforcement: Explicitly added PRAGMA journal_mode=WAL in the database setup. This enables non-blocking concurrent reads, which is critical when multiple pipeline workers are reading context for the LLM.
+Blob Handling: Changed the content column type to BLOB. This ensures binary safety, allowing the storage to handle any character encoding issues or binary files without crashing SQL queries.
+2. src/storage/metadata_store.py
+
+Objective: Create a rich query engine that acts as the "Source of Truth" for file information and relationships.
+
+Removed:
+
+Unimplemented Backends: Removed the MetadataBackend Enum options for PostgreSQL, MongoDB, Redis, and Elasticsearch. These existed only as configuration placeholders without actual implementation code, creating a false sense of capability.
+Separate Relationship Tables: Removed specific tables like chunk_relationships and tags. While these features are useful, managing them in separate tables requires complex JOINs during high-throughput writing.
+Implemented:
+
+JSON Column (json_data): Implemented a hybrid schema. Key fields (ID, Repository, Language) are strict SQL columns for fast indexing. All other attributes (tags, AST relationships, authors) are stored in a json_data TEXT column. This restores the flexibility lost from the old embedding_storage.py, allowing you to store arbitrary Python dictionaries.
+FTS5 Integration (Full-Text Search): Implemented a search_index Virtual Table using SQLite's FTS5 engine. This allows Google-like keyword search over file paths, descriptions, and comments, synchronized automatically with the main metadata table updates.
+Python-Logic Filtering in SQL: Implemented search_by_metadata which generates SQL json_extract queries dynamically. This allows the pipeline to filter by deeply nested JSON fields (e.g., WHERE json_extract(json_data, '$.class_name') = 'MyClass') efficiently.
+3. src/storage/vector_store.py
+
+Objective: Provide a production-grade Vector Database using FAISS without external dependencies like Docker containers.
+
+Removed:
+
+Heavy Client Imports: Removed global imports for chromadb, weaviate, qdrant_client, pinecone, pymilvus, elasticsearch, and torch. Removing these reduced the installation footprint by hundreds of megabytes and eliminated the risk of import errors for unused backends.
+Abstract Factory Pattern: Removed the complex factory logic that promised multiple backends but implemented none.
+Implemented:
+
+Concrete FAISS Implementation: Added the actual logic to initialize faiss.IndexFlatL2 (or IVFFlat in future iterations).
+ID Mapping System: Implemented a robust bidirectional mapping system (id_map and reverse_id_map). FAISS only understands integer IDs (0, 1, 2...), while your chunks have string UUIDs. This system translates between them transparently during add/search/delete operations.
+Index Persistence: Implemented save() and load() methods that serialize the FAISS index to a .bin file and the ID maps to a .pkl file. This ensures the vector search index survives application restarts.
+Lazy Loading: Wrapped the import faiss statement inside the class __init__. This ensures the application can still start (for metadata/content operations) even if the FAISS binary bindings are missing on a specific environment.
+4. src/storage/storage_manager.py (New File)
+
+Objective: Act as the Facade (Entry Point) that orchestrates the three distinct stores above, ensuring data consistency.
+
+Implemented:
+
+Unified Initialization: One class that boots up the Chunk, Metadata, and Vector stores in the correct order.
+Atomic-like Batch Operations: Implemented batch_save. It orchestrates the write order: save content -> save metadata -> add vectors. This centralization reduces the chance of "Zombie Vectors" (vectors that point to non-existent content).
+Hydrated Search: Implemented a search method that performs the vector query, gets the results, and immediately fetches the corresponding Code Content and Metadata. This mimics the response format of databases like Pinecone/Weaviate but runs entirely local.
+Data Export (Restored Feature): Re-implemented the export_data functionality. It reads metadata from SQLite and reconstructs vectors from the FAISS index (using index.reconstruct), joining them into a unified list that can be exported to Parquet or JSON. This explicitly bridges the functionality gap identified in the review.
+5. src/pipeline/chunk_processor.py
+
+Objective: Update the data ingestion pipeline to use the new architecture.
+
+Removed:
+
+EmbeddingStorage Usage: Removed all references to src.embeddings.embedding_storage. This effectively deprecates the old "Shadow Storage" system.
+Implemented:
+
+Manager Integration: Updated _init_components to initialize the StorageManager.
+Batch Save Logic: Refactored _store_embeddings_batch to pass distinct lists of chunks and embeddings to the Manager, adhering to the new API.
+6. src/embeddings/embedding_storage.py
+
+Status: Deprecated / Obsolete.
+
+Reasoning: All useful logic from this file (HDF5-style metadata handling, FAISS indexing, Parquet export) has been extracted, improved, and distributed into the modular files listed above. This file should be deleted to prevent confusion.

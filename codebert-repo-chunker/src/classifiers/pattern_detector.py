@@ -13,9 +13,9 @@ from enum import Enum
 import json
 import yaml
 from datetime import datetime
-import logging
+from src.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class PatternType(Enum):
     """Types of patterns detected"""

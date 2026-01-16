@@ -21,7 +21,7 @@ from pathlib import Path
 import json
 import hashlib
 import pickle
-import logging
+from src.utils.logger import get_logger
 from collections import defaultdict
 from enum import Enum
 import time
@@ -30,7 +30,7 @@ import faiss
 import onnxruntime as ort
 from sentence_transformers import SentenceTransformer
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class ModelType(Enum):
     """Available model types for code embedding"""

@@ -1,10 +1,10 @@
 from typing import List, Dict, Any, Optional, Type
 from pathlib import Path
-import logging
+from src.utils.logger import get_logger
 
 from src.pipeline.parsers.base_parser import BaseManifestParser, Dependency
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class DependencyResolver:
     """

@@ -64,6 +64,30 @@ class ChunkStorage:
             logger.error(f"Chunk store error for {chunk_id}: {e}")
             return False
 
+    def store_batch(self, chunks: List[Tuple[str, str, str, str]]) -> int:
+        """
+        Batch store chunks.
+        Args: chunks: List of (chunk_id, content, file_path, language)
+        Returns: count stored
+        """
+        if not chunks: return 0
+        try:
+            batch = [
+                (cid, zlib.compress(c.encode('utf-8'), self.config.compression_level), 
+                 self._normalize_path(fp), lang, len(c))
+                for cid, c, fp, lang in chunks
+            ]
+            with self.conn:
+                self.conn.executemany("""
+                    INSERT OR REPLACE INTO chunks 
+                    (chunk_id, content, file_path, language, size_bytes)
+                    VALUES (?, ?, ?, ?, ?)
+                """, batch)
+            return len(batch)
+        except Exception as e:
+            logger.error(f"Batch store error: {e}")
+            return 0
+
     def retrieve(self, chunk_id: str) -> Optional[str]:
         cursor = self.conn.execute("SELECT content FROM chunks WHERE chunk_id = ?", (chunk_id,))
         row = cursor.fetchone()

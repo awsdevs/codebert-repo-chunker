@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
-import logging
+from src.utils.logger import get_logger
 import shutil
 import threading
 from collections import defaultdict
@@ -30,7 +30,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from abc import ABC, abstractmethod
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class StorageBackend(Enum):
     """Available storage backends"""

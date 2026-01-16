@@ -84,9 +84,9 @@ class StorageManager:
                 chunk.language
             )
             
-            # 2. Store Metadata (Strip large fields)
+            # 2. Store Metadata (Strip large fields handled by MetadataStore)
             metadata_payload = chunk.to_dict()
-            metadata_payload.pop('content', None)
+            # Content is needed for FTS in MetadataStore, so don't pop it here
             metadata_payload.pop('embedding', None)
             
             # Helper: Flatten essential location data for easier indexing
@@ -107,6 +107,52 @@ class StorageManager:
         except Exception as e:
             logger.error(f"Failed to store chunk {chunk.id}: {e}")
             return False
+
+    def store_chunks_batch(self, chunks: List[Chunk]) -> int:
+        """
+        Store a batch of chunks across all backends.
+        Returns the number of chunks successfully stored.
+        """
+        if not chunks:
+            return 0
+            
+        try:
+            # Prepare batches
+            chunk_data = []
+            metadata_list = []
+            vector_ids = []
+            vector_embeddings = []
+            
+            for chunk in chunks:
+                chunk_data.append((chunk.id, chunk.content, chunk.location.file_path, chunk.language))
+                
+                # Inject content into metadata for FTS
+                # Make a shallow copy to avoid mutating the original chunk.metadata persistently if unwanted
+                meta = chunk.metadata.copy() if chunk.metadata else {}
+                meta['content'] = chunk.content
+                metadata_list.append((chunk.id, meta))
+                
+                if chunk.embedding is not None and isinstance(chunk.embedding, np.ndarray):
+                    vector_ids.append(chunk.id)
+                    vector_embeddings.append(chunk.embedding)
+
+            # Store in parallel/sequence
+            # 1. Chunk Storage
+            c_count = self.chunk_storage.store_batch(chunk_data)
+            
+            # 2. Metadata Store
+            m_count = self.metadata_store.store_batch(metadata_list)
+            
+            # 3. Vector Store
+            if self.vector_store and vector_ids:
+                embeddings_np = np.vstack(vector_embeddings)
+                self.vector_store.add(vector_ids, embeddings_np)
+                
+            logger.info(f"Batch stored {len(chunks)} chunks (Chunks: {c_count}, Meta: {m_count})")
+            return len(chunks)
+        except Exception as e:
+            logger.error(f"Failed to store chunks batch: {e}")
+            return 0
             
     def get_chunk(self, chunk_id: str) -> Optional[Chunk]:
         """Retrieve a complete chunk"""

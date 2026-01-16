@@ -10,10 +10,10 @@ from dataclasses import dataclass, field
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-import logging
+from src.utils.logger import get_logger
 import json
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class MetricValue:

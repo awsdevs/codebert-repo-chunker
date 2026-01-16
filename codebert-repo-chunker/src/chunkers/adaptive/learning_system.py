@@ -18,12 +18,12 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
-import logging
+from src.utils.logger import get_logger
 import threading
 import queue
 from enum import Enum
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class StrategyEffectiveness(Enum):
     """Effectiveness ratings for chunking strategies"""

@@ -17,9 +17,9 @@ import base64
 import zlib
 import hashlib
 from enum import Enum
-import logging
+from src.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class SerializationFormat(Enum):
     """Supported serialization formats"""

@@ -11,14 +11,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple, Set, Union, Callable
 from enum import Enum
-import logging
+from src.utils.logger import get_logger
 import re
 from collections import defaultdict
 import time
 
 from src.core.chunk_model import Chunk, ChunkLocation, ChunkType
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Removed Duplicate ChunkType, ChunkMetadata, ChunkRelation, Chunk classes
 # We use src.core.chunk_model.Chunk
