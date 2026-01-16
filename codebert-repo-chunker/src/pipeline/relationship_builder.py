@@ -25,7 +25,7 @@ from tqdm import tqdm
 # Internal imports
 from src.core.chunk_model import Chunk, ChunkRelation, RelationType
 from src.core.file_context import FileContext
-from src.embeddings.embedding_storage import EmbeddingStorage
+from src.storage.vector_store import VectorStore
 from src.classifiers.content_analyzer import ContentAnalyzer
 from src.utils.similarity import SimilarityCalculator
 from src.utils.graph_utils import GraphAnalyzer, CommunityDetector
@@ -163,7 +163,7 @@ class RelationshipBuilder:
     
     def build_relationships(self, 
                           chunks: List[Chunk],
-                          storage: Optional[EmbeddingStorage] = None,
+                          storage: Optional[VectorStore] = None,
                           show_progress: bool = True) -> RelationshipGraph:
         """
         Build relationships between chunks
@@ -251,11 +251,11 @@ class RelationshipBuilder:
             self.graph.add_node(
                 chunk.id,
                 chunk_type=chunk.chunk_type.value,
-                file_path=chunk.file_path,
-                language=chunk.metadata.language,
+                file_path=chunk.location.file_path,
+                language=chunk.language,
                 size=len(chunk.content),
-                lines=chunk.line_count,
-                complexity=chunk.metadata.metrics.get('complexity', 0)
+                lines=chunk.location.end_line - chunk.location.start_line + 1,
+                complexity=chunk.metadata.get('metrics', {}).get('complexity', 0)
             )
     
     def _analyze_imports(self, chunks: List[Chunk], show_progress: bool) -> List[RelationshipEdge]:
@@ -267,7 +267,7 @@ class RelationshipBuilder:
             chunks = tqdm(chunks, desc="Analyzing imports")
         
         for chunk in chunks:
-            if not chunk.metadata.language:
+            if not chunk.language:
                 continue
             
             # Extract imports from chunk
@@ -295,58 +295,12 @@ class RelationshipBuilder:
     
     def _extract_imports(self, chunk: Chunk) -> List[str]:
         """Extract import statements from chunk"""
-        imports = []
-        
-        if chunk.metadata.language == 'python':
-            # Python imports
-            import_pattern = re.compile(r'^\s*(?:from\s+([^\s]+)\s+)?import\s+([^\s]+)', re.MULTILINE)
-            for match in import_pattern.finditer(chunk.content):
-                module = match.group(1) or match.group(2)
-                imports.append(module)
-            
-            # Also parse with AST for accuracy
-            try:
-                tree = ast.parse(chunk.content)
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        for alias in node.names:
-                            imports.append(alias.name)
-                    elif isinstance(node, ast.ImportFrom):
-                        if node.module:
-                            imports.append(node.module)
-            except:
-                pass
-        
-        elif chunk.metadata.language in ['javascript', 'typescript']:
-            # JavaScript/TypeScript imports
-            import_patterns = [
-                re.compile(r'import\s+.*?\s+from\s+[\'"]([^\'"]+)[\'"]'),
-                re.compile(r'require\s*\(\s*[\'"]([^\'"]+)[\'"]'),
-                re.compile(r'import\s*\(\s*[\'"]([^\'"]+)[\'"]')  # Dynamic imports
-            ]
-            for pattern in import_patterns:
-                for match in pattern.finditer(chunk.content):
-                    imports.append(match.group(1))
-        
-        elif chunk.metadata.language == 'java':
-            # Java imports
-            import_pattern = re.compile(r'^\s*import\s+([^;]+);', re.MULTILINE)
-            for match in import_pattern.finditer(chunk.content):
-                imports.append(match.group(1))
-        
-        elif chunk.metadata.language == 'go':
-            # Go imports
-            import_pattern = re.compile(r'import\s+(?:\(([^)]+)\)|"([^"]+)")')
-            for match in import_pattern.finditer(chunk.content):
-                if match.group(1):  # Multiple imports
-                    for line in match.group(1).split('\n'):
-                        line = line.strip().strip('"')
-                        if line:
-                            imports.append(line)
-                elif match.group(2):  # Single import
-                    imports.append(match.group(2))
-        
-        return imports
+        try:
+            from src.utils.import_extractor import ImportExtractor
+            return ImportExtractor.extract_imports(chunk.content, chunk.language)
+        except Exception as e:
+            logger.warning(f"Failed to extract imports for chunk {chunk.id}: {e}")
+            return []
     
     def _find_matching_chunks(self, import_name: str, chunks: List[Chunk]) -> List[Chunk]:
         """Find chunks that match an import name"""
@@ -371,8 +325,9 @@ class RelationshipBuilder:
                     continue
             
             # Check exports
-            if chunk.metadata.exports:
-                if import_base in chunk.metadata.exports:
+            exports = chunk.metadata.get('exports', [])
+            if exports:
+                if import_base in exports:
                     matching.append(chunk)
         
         return matching
@@ -386,7 +341,7 @@ class RelationshipBuilder:
             chunks = tqdm(chunks, desc="Analyzing calls")
         
         for chunk in chunks:
-            if not chunk.metadata.language:
+            if not chunk.language:
                 continue
             
             # Extract function calls
@@ -416,7 +371,7 @@ class RelationshipBuilder:
         """Extract function call names from chunk"""
         calls = []
         
-        if chunk.metadata.language == 'python':
+        if chunk.language == 'python':
             # Python function calls
             try:
                 tree = ast.parse(chunk.content)
@@ -432,7 +387,7 @@ class RelationshipBuilder:
                 for match in call_pattern.finditer(chunk.content):
                     calls.append(match.group(1))
         
-        elif chunk.metadata.language in ['javascript', 'typescript']:
+        elif chunk.language in ['javascript', 'typescript']:
             # JavaScript function calls
             call_patterns = [
                 re.compile(r'(\w+)\s*\('),  # Regular calls
@@ -443,7 +398,7 @@ class RelationshipBuilder:
                 for match in pattern.finditer(chunk.content):
                     calls.append(match.group(1))
         
-        elif chunk.metadata.language == 'java':
+        elif chunk.language == 'java':
             # Java method calls
             call_patterns = [
                 re.compile(r'\.(\w+)\s*\('),  # Method calls
@@ -468,7 +423,7 @@ class RelationshipBuilder:
                         continue
             
             # Check content for function definition
-            if self._contains_function_definition(chunk.content, function_name, chunk.metadata.language):
+            if self._contains_function_definition(chunk.content, function_name, chunk.language):
                 matching.append(chunk)
         
         return matching
@@ -532,7 +487,7 @@ class RelationshipBuilder:
         """Extract parent class names from chunk"""
         parents = []
         
-        if chunk.metadata.language == 'python':
+        if chunk.language == 'python':
             # Python inheritance
             class_pattern = re.compile(r'class\s+\w+\s*\(([^)]+)\)')
             for match in class_pattern.finditer(chunk.content):
@@ -542,7 +497,7 @@ class RelationshipBuilder:
                     if parent and parent != 'object':
                         parents.append(parent)
         
-        elif chunk.metadata.language == 'java':
+        elif chunk.language == 'java':
             # Java inheritance
             extends_pattern = re.compile(r'extends\s+(\w+)')
             implements_pattern = re.compile(r'implements\s+([\w\s,]+)')
@@ -555,13 +510,13 @@ class RelationshipBuilder:
                 for interface in interfaces.split(','):
                     parents.append(interface.strip())
         
-        elif chunk.metadata.language in ['javascript', 'typescript']:
+        elif chunk.language in ['javascript', 'typescript']:
             # JavaScript/TypeScript inheritance
             extends_pattern = re.compile(r'class\s+\w+\s+extends\s+(\w+)')
             for match in extends_pattern.finditer(chunk.content):
                 parents.append(match.group(1))
         
-        elif chunk.metadata.language == 'cpp':
+        elif chunk.language == 'cpp':
             # C++ inheritance
             inherit_pattern = re.compile(r'class\s+\w+\s*:\s*(?:public|private|protected)?\s*(\w+)')
             for match in inherit_pattern.finditer(chunk.content):
@@ -582,7 +537,7 @@ class RelationshipBuilder:
                         continue
             
             # Check content for class definition
-            if self._contains_class_definition(chunk.content, class_name, chunk.metadata.language):
+            if self._contains_class_definition(chunk.content, class_name, chunk.language):
                 matching.append(chunk)
         
         return matching
@@ -608,7 +563,7 @@ class RelationshipBuilder:
         return False
     
     def _analyze_similarity(self, chunks: List[Chunk], 
-                          storage: EmbeddingStorage,
+                          storage: VectorStore,
                           show_progress: bool) -> List[RelationshipEdge]:
         """Analyze similarity-based relationships"""
         logger.info("Analyzing similarity relationships")
@@ -625,12 +580,65 @@ class RelationshipBuilder:
                 if embedding is not None:
                     embeddings[chunk.id] = embedding
         
-        # Calculate pairwise similarities
+        # Use optimized vector search if available
+        if hasattr(storage, 'search'):
+            if show_progress:
+                chunks_iter = tqdm(chunks, desc="Calculating similarities (Vector Search)")
+            else:
+                chunks_iter = chunks
+
+            for chunk in chunks_iter:
+                embedding = embeddings.get(chunk.id)
+                if embedding is None:
+                    continue
+                
+                # Search for nearest neighbors
+                # k=20 to find enough candidates above threshold
+                try:
+                    results = storage.search(embedding, k=20)
+                except Exception as e:
+                    logger.warning(f"Vector search failed for chunk {chunk.id}: {e}")
+                    continue
+                
+                for target_id, score in results:
+                    if target_id == chunk.id:
+                        continue
+                        
+                    # FAISS returns Inner Product (Cosine if normalized)
+                    # VectorStore already handles normalization
+                    similarity = score
+                    
+                    if similarity >= self.config.similarity_threshold:
+                        # Avoid duplicates (only store if source < target or check graph)
+                        # But here we iterating source efficiently.
+                        # To avoid A->B and B->A duplicates in logic, 
+                        # we can either check existing edges or just allow bidirectional.
+                        # RelationshipEdge supports bidirectional=True.
+                        # If we just add A->B, the graph builder handles it?
+                        # MasterPipeline loop: we process each chunk.
+                        # If we assume A->B covers B->A, we can enforce ID ordering.
+                        if target_id < chunk.id:
+                             continue # Handle pair only once
+                             
+                        rel = RelationshipEdge(
+                            source_id=chunk.id,
+                            target_id=target_id,
+                            relation_type=RelationType.SIMILAR_TO,
+                            strength=similarity,
+                            confidence=RelationshipConfidence.HIGH.value,
+                            bidirectional=True,
+                            metadata={'similarity_score': similarity},
+                            evidence=[f"Similarity score: {similarity:.3f}"]
+                        )
+                        relationships.append(rel)
+                        self.stats['similarity_relationships'] += 1
+            return relationships
+
+        # Fallback to O(n^2) if no search method
         chunk_ids = list(embeddings.keys())
-        
         if show_progress:
             total_pairs = len(chunk_ids) * (len(chunk_ids) - 1) // 2
-            pbar = tqdm(total=total_pairs, desc="Calculating similarities")
+            pbar = tqdm(total=total_pairs, desc="Calculating similarities (O(n^2))")
         
         for i, chunk_id1 in enumerate(chunk_ids):
             for chunk_id2 in chunk_ids[i+1:]:

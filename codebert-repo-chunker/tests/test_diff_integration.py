@@ -3,6 +3,12 @@ import shutil
 import tempfile
 import sqlite3
 import hashlib
+import os
+
+# CRITICAL: Prevent OpenMP conflicts
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
+import torch # Safety import
 from pathlib import Path
 from src.pipeline.master_pipeline import MasterPipeline, PipelineConfig
 from src.storage.storage_manager import StorageConfig

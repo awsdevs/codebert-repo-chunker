@@ -118,13 +118,11 @@ class ChunkProcessor:
             logger.warning(f"Could not read {file_path}: {e}")
             return []
 
-        print(f"DEBUG: Classifying {file_path}")
         classification = self.classifier.classify(file_path, content)
         
         # 2. Chunk
         # Use registry to Chunk
         try:
-            print(f"DEBUG: Chunking {file_path}")
             chunks = self.registry.chunk_file(file_path, content=content)
             
             # Relativize path if needed (crucial for diff logic consistency)
@@ -168,7 +166,6 @@ class ChunkProcessor:
         # 3. Embed
         if self.encoder and chunks:
             try:
-                print(f"DEBUG: Embedding {len(chunks)} chunks for {file_path}")
                 # Extract text for embedding
                 texts = [c.content for c in chunks]
                 results = self.encoder.encode(texts)

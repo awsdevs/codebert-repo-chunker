@@ -42,8 +42,10 @@ class JavaParser(BaseManifestParser):
                         type=dep_type,
                         source_file='pom.xml'
                     ))
-        except ET.ParseError:
-            pass
+        except ET.ParseError as e:
+            from src.utils.logger import get_logger
+            logger = get_logger(__name__)
+            logger.warning(f"Failed to parse maven {file_path}: {e}")
         return deps
 
     def _parse_gradle(self, content: str) -> List[Dependency]:

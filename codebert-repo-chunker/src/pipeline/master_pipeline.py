@@ -7,7 +7,7 @@ import shutil
 from typing import Dict, Any, List, Optional, Set, Union
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import yaml
+
 import json
 import asyncio
 import hashlib
@@ -19,6 +19,7 @@ from pathlib import Path
 from src.pipeline.repository_scanner import RepositoryScanner, ScannerConfig
 from src.pipeline.dependency_resolver import DependencyResolver
 from src.pipeline.quality_analyzer import QualityAnalyzer
+from src.pipeline.relationship_builder import RelationshipBuilder, RelationshipConfig
 from src.pipeline.report_generator import ReportGenerator
 
 # Imports for distributed processing (Celery)
@@ -146,6 +147,8 @@ class MasterPipeline:
             # 3. New Modules
             self.scanner = RepositoryScanner()
             self.dependency_resolver = DependencyResolver()
+            # Analysis
+            self.relationship_builder = RelationshipBuilder()
             self.quality_analyzer = QualityAnalyzer()
             self.report_generator = ReportGenerator()
                 
@@ -195,14 +198,17 @@ class MasterPipeline:
         self.dependency_data = requests
         return requests.get("graph", {}), requests.get("imports", {})
 
-    def _analyze_quality(self, chunks_dir: Path):
+    def _analyze_quality(self, chunks: List[Any]):
         """Quality Analysis phase"""
         if not self.quality_analyzer:
             return
         
         logger.info("Analyzing code quality...")
-        # This would iterate over chunks and update their metadata
-        self.quality_analyzer.analyze_directory(chunks_dir)
+        # Analyze chunks in memory or from list
+        results = self.quality_analyzer.analyze_chunks(chunks)
+        # We could merge results into stats or existing metadata?
+        # For now just logging summary or storing report data if needed
+        self.stats['quality'] = results.get('overall_score', 0)
 
     def _generate_reports(self, session_id: str, dependency_graph: Dict[str, Any] = None, module_map: Dict[str, str] = None, repo_name: str = "unknown"):
         """Reporting phase"""
@@ -321,8 +327,30 @@ class MasterPipeline:
             chunks = self.chunk_processor.process_batch(files_to_process, repo_root=repo_path)
             self.stats["chunks_created"] += len(chunks)
             
-            # 4. Quality
-            self._analyze_quality(self.storage_manager.config.base_path / "chunks")
+            # 5. Relationships
+            # Integrate RelationshipBuilder as requested in Code Review
+            if chunks: # Only build if we have new chunks or force full scan? 
+                # Ideally we need ALL chunks for relationships. 
+                # For now, if incremental, we might be missing context. 
+                # But typically we want to run this on the full set.
+                # Let's try to get all chunks from storage if possible, or just build for new ones (partial).
+                # Reviewer said: "Cross-file relationships... never computed".
+                # We should instantiate and run it.
+                logger.info("Building relationship graph...")
+                graph = self.relationship_builder.build_relationships(chunks, storage=self.storage_manager.vector_store)
+                self.relationship_graph = graph
+                
+                # Persist graph (simple pickle for now)
+                try:
+                    graph_path = self.storage_manager.config.base_path / "relationship_graph.pkl"
+                    with open(graph_path, "wb") as f:
+                        pickle.dump(graph, f)
+                    logger.info(f"Persisted relationship graph to {graph_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to persist relationship graph: {e}")
+
+            # 6. Quality
+            self._analyze_quality(chunks)
             
             # 5. Report
             session_id = f"run_{int(time.time())}"
