@@ -16,11 +16,12 @@ Implement "smart updates" in the `MasterPipeline` to avoid re-processing files t
 - **Update Method**: `run(self, repo_path: Union[str, Path])`
     - logic:
         1. Scan for all files.
-        2. Compute current map `{file_path: checksum}`.
+        2. Compute current map `{relative_path: checksum}` (Use **Relative Paths** for OS-agnostic persistence).
         3. Retrieve stored map from `storage_manager.get_file_checksums(repo_name)`.
-        4. Identify `new`, `modified`, `deleted` files.
-        5. Call `storage_manager.delete_file_chunks(deleted_files + modified_files)`.
-        6. Pass only `new + modified` files to `chunk_processor.process_batch`.
+        4. Detect `new`, `modified`, `deleted` files (Language agnostic - works on all scanned files).
+        5. **Crash Recovery**: Check identifying marker (e.g. `last_run_status`). If previous run crashed (not "COMPLETED"), log warning and optionally force full re-scan or verify integrity.
+        6. Call `storage_manager.delete_file_chunks(deleted_files + modified_files)`.
+        7. Pass only `new + modified` files to `chunk_processor.process_batch`.
 
 ### [MODIFY] [storage_manager.py](file:///Users/sai/saiData/codebert_google/codebert_google/codebert-repo-chunker/src/storage/storage_manager.py)
 - **Verification**: Ensure `delete_file_chunks` and `get_file_checksums` are exposed and working (Already done in previous phase, will verify).
