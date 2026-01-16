@@ -39,3 +39,23 @@ Implement "smart updates" in the `MasterPipeline` to avoid re-processing files t
 - Run pipeline twice on the same repo.
     - Run 1: Normal duration.
     - Run 2: Near instant (only scanning overhead).
+    - Run 2: Near instant (only scanning overhead).
+
+## Robustness & Fixes (User Feedback)
+
+### [MODIFY] [vector_store.py](file:///Users/sai/saiData/codebert_google/codebert_google/codebert-repo-chunker/src/storage/vector_store.py)
+- **Problem**: `IndexIDMap` wrapper hides `is_trained` and `train()` methods of the underlying IVF index, causing crashes.
+- **Fix**:
+    - Add `_get_underlying_index(self)` helper.
+    - Update `_ensure_trained` and `add` to access the underlying index for training checks.
+
+### [MODIFY] [metadata_store.py](file:///Users/sai/saiData/codebert_google/codebert_google/codebert-repo-chunker/src/storage/metadata_store.py)
+- **Problem**: `store_batch` does not replace existing FTS entries, causing duplicate search results on re-runs.
+- **Fix**: Execute `DELETE FROM search_index WHERE chunk_id = ?` before inserting into FTS table in `store_batch`.
+
+### [MODIFY] [quality_analyzer.py](file:///Users/sai/saiData/codebert_google/codebert_google/codebert-repo-chunker/src/pipeline/quality_analyzer.py)
+- **Problem**: Silent exception swallowing (`pass`) makes debugging impossible.
+- **Fix**: Replace `pass` with `logger.warning(f"Failed to analyze... {e}")`.
+
+### [MODIFY] [demo_search.py](file:///Users/sai/saiData/codebert_google/codebert_google/codebert-repo-chunker/demo_search.py)
+- **Refinement**: Replace generic `Logger` search with a project-specific pattern search (e.g., `ConfigLoader.load_config` usage) to demonstrate structural/pattern search capabilities.

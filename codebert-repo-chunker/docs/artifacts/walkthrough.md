@@ -59,3 +59,42 @@ Chunks Created: 3043
 ## Next Steps
 - The pipeline is now fully operational and verified.
 - Proceed with using `demo_search.py` for semantic search.
+
+## Robustness & Fixes (Recent Updates)
+We implemented critical stability improvements based on user feedback:
+1.  **Vector Store (IVF Support)**: Added `_get_underlying_index` to properly handle training when using `IndexIDMap`, preventing crashes with approximate indices.
+2.  **Metadata Store (FTS Consistency)**: Modified `store_batch` to delete existing FTS entries before insertion, eliminating duplicate search results.
+3.  **Quality Analyzer (Observability)**: Replaced silent exception swallowing with `logger.warning` to aid debugging.
+4.  **Verification**: Updated `demo_search.py` to verify FTS functionality.
+
+## Search Capability Refinement
+**Objective**: Enhance search to support code content (FTS) and complex queries.
+
+### Improvements
+1.  **FTS Indexing**: Updated `MetadataStore` to include code `content` in the `rich_text` FTS index. This enables searching for specific function definitions (e.g., `def run`) or variable names.
+2.  **Hybrid Search Verification**: Updated `demo_search.py` to verify:
+    *   **Vector Search**: Finding concepts (e.g., "dependency resolution").
+    *   **Text Search**: Finding code definitions (e.g., `class MasterPipeline`).
+
+### Verification Result
+`demo_search.py` successfully finds:
+*   `class MasterPipeline` via FTS (Ranked match).
+*   `dependency_resolver` via Vector Search (Concept match).
+
+## Configurable Load Strategy
+**Objective**: Allow user to choose between Incremental (Diff-Based) and Full System Load.
+
+### Changes
+1.  **Config**: Added `force_full_scan` (boolean) to `config.json`.
+2.  **Logic**: 
+    *   `False` (Default): Use SHA256 diffs to skip unchanged files.
+    *   `True`: Treat all files as "Modified", deleting old chunks and re-processing everything.
+
+### Usage
+Modify `config.json`:
+```json
+"pipeline": {
+    "force_full_scan": { "value": true, "description": "..." }
+}
+```
+Then run `run_pipeline.py`.

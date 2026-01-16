@@ -59,9 +59,25 @@
     - [x] Implement batch inserts for SQLite (ChunkStorage, MetadataStore)
     - [x] Update ChunkProcessor to use batch storage
     - [x] Verify with `test_batch_ops.py`
+    - [x] Verify with `test_batch_ops.py`
     - [ ] Tune FAISS parameters if needed
+- [x] **Implement Diff-Based Pipeline Logic** (Phase 2 Integration)
+    - [x] Update `MasterPipeline` to utilize `delete_file_chunks` and `get_file_checksums`
+    - [x] Implement `sync_repository` logic (Orchestrated in run method)
+    - [x] **Verification**: `tests/test_diff_integration.py` passed
 - [x] **Robustness & Data Integrity** (Phase 4)
     - [x] **VectorStore**: Implement O(1) removal (reverse_map) and fix IVF removal
     - [x] **MetadataStore**: Add indexes for `file_path`, `repository`
     - [x] **MasterPipeline**: Fix double report generation
-    - [ ] Enhance FTS rich text builder (Refinement)
+    - [x] Enhance FTS rich text builder (Refinement)
+- [x] **External Configuration Management** (User Request)
+    - [x] Create `config.json` with descriptions (Rationale field)
+    - [x] Implement `ConfigLoader` to hydrate `PipelineConfig`
+    - [x] Update `MasterPipeline` to load from config file
+    - [x] **Configurable Load Strategy**: Added `force_full_scan` option (User Request)
+- [x] **Robustness Fixes** (User Feedback)
+    - [x] **VectorStore**: Fix IVF training via `IndexIDMap` wrapper
+    - [x] **MetadataStore**: Fix duplicate FTS entries in `store_batch`
+    - [x] **QualityAnalyzer**: Remove silent exception swallowing
+    - [x] **Demo Search**: Implement specific pattern search test
+
