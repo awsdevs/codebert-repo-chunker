@@ -21,7 +21,7 @@ def demo_search():
     encoder = CodeBERTEncoder()
     
     # 3. Embed Query
-    query_text = "Find code that handles database connection"
+    query_text = "database schema"
     print(f"\nQuery: '{query_text}'")
     
     query_embedding = encoder.encode([query_text]).embeddings[0]
